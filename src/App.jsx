@@ -4083,7 +4083,7 @@ function CommandPalette({setPage, prospects, onClose, toast}) {
             </div>
           ))}
         </div>
-        {q.length===0&&<div style={{padding:'8px 18px',borderTop:'1px solid rgba(201,168,76,.06)',display:'flex',gap:16'}}>
+        {q.length===0&&<div style={{padding:'8px 18px',borderTop:'1px solid rgba(201,168,76,.06)',display:'flex',gap:16}}>
           {[{k:'↵',l:'Select'},{k:'↑↓',l:'Navigate'},{k:'Esc',l:'Close'}].map(({k,l})=>(
             <div key={k} style={{display:'flex',alignItems:'center',gap:5}}>
               <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.54rem',background:'#0a0a14',border:'1px solid rgba(201,168,76,.15)',color:'#c9a84c',padding:'2px 6px'}}>{k}</span>
@@ -9346,7 +9346,7 @@ function CommandPalette({setPage, prospects, onClose, toast}) {
             </div>
           ))}
         </div>
-        {q.length===0&&<div style={{padding:'8px 18px',borderTop:'1px solid rgba(201,168,76,.06)',display:'flex',gap:16'}}>
+        {q.length===0&&<div style={{padding:'8px 18px',borderTop:'1px solid rgba(201,168,76,.06)',display:'flex',gap:16}}>
           {[{k:'↵',l:'Select'},{k:'↑↓',l:'Navigate'},{k:'Esc',l:'Close'}].map(({k,l})=>(
             <div key={k} style={{display:'flex',alignItems:'center',gap:5}}>
               <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.54rem',background:'#0a0a14',border:'1px solid rgba(201,168,76,.15)',color:'#c9a84c',padding:'2px 6px'}}>{k}</span>
