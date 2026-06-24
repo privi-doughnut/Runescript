@@ -2195,7 +2195,7 @@ function CRMPage({prospects,updateProspect,removeProspect,setPage,toast}){
             </table>
           </div>
         </div>
-      )}
+      ))}
       {selected&&(
         <>
           <div className="drawer-bg" onClick={()=>setSelected(null)}/>
@@ -7458,7 +7458,7 @@ function CRMPage({prospects,updateProspect,removeProspect,setPage,toast}){
             </table>
           </div>
         </div>
-      )}
+      ))}
       {selected&&(
         <>
           <div className="drawer-bg" onClick={()=>setSelected(null)}/>
