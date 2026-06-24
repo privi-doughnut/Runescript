@@ -1,0 +1,15 @@
+name = "claude-proxy"
+main = "index.js"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Routes — update "runescript" to your actual Cloudflare account subdomain
+# This makes the worker available at claude-proxy.YOUR-SUBDOMAIN.workers.dev
+# You can also add a custom route after deployment
+
+[env.production]
+name = "claude-proxy-prod"
+
+# After running `wrangler deploy`, set your API key with:
+# wrangler secret put ANTHROPIC_API_KEY
+# (It will prompt you to paste the key — never stored in this file)
