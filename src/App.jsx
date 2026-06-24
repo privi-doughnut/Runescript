@@ -2176,7 +2176,7 @@ function CRMPage({prospects,updateProspect,removeProspect,setPage,toast}){
           })}
         </div>
       )}
-      {view==='table'&&      {filtered.length===0?<div className="empty"><div className="empty-rune">ᚨ</div><div className="empty-title">No prospects here</div><div className="empty-sub">{prospects.length===0?"Run a scan to start.":"No prospects with this status."}</div>{prospects.length===0&&<button className="btn btn-gold" onClick={()=>setPage("scanner")}>Start Scanning</button>}</div>:(
+      {view==='table'&&(filtered.length===0?<div className="empty"><div className="empty-rune">ᚨ</div><div className="empty-title">No prospects here</div><div className="empty-sub">{prospects.length===0?"Run a scan to start.":"No prospects with this status."}</div>{prospects.length===0&&<button className="btn btn-gold" onClick={()=>setPage("scanner")}>Start Scanning</button>}</div>:(
         <div className="card" style={{padding:0}}>
           <div className="tbl-wrap">
             <table>
@@ -7439,7 +7439,7 @@ function CRMPage({prospects,updateProspect,removeProspect,setPage,toast}){
           })}
         </div>
       )}
-      {view==='table'&&      {filtered.length===0?<div className="empty"><div className="empty-rune">ᚨ</div><div className="empty-title">No prospects here</div><div className="empty-sub">{prospects.length===0?"Run a scan to start.":"No prospects with this status."}</div>{prospects.length===0&&<button className="btn btn-gold" onClick={()=>setPage("scanner")}>Start Scanning</button>}</div>:(
+      {view==='table'&&(filtered.length===0?<div className="empty"><div className="empty-rune">ᚨ</div><div className="empty-title">No prospects here</div><div className="empty-sub">{prospects.length===0?"Run a scan to start.":"No prospects with this status."}</div>{prospects.length===0&&<button className="btn btn-gold" onClick={()=>setPage("scanner")}>Start Scanning</button>}</div>:(
         <div className="card" style={{padding:0}}>
           <div className="tbl-wrap">
             <table>
