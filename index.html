@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Rune Script — Find prospects, generate pitches, build sites, and run your entire web design agency in one platform." />
+    <meta property="og:title" content="Rune Script — Build Websites. Build an Empire." />
+    <meta property="og:description" content="The only platform that finds the client, writes the pitch, builds the site, and runs your agency." />
+    <meta property="og:type" content="website" />
+    <meta name="theme-color" content="#07070e" />
+
+    <!-- Favicons (RealFaviconGenerator) -->
+    <link rel="icon" type="image/png" href="/favicon-96x96.png?v=1" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=1" />
+    <link rel="shortcut icon" href="/favicon.ico?v=1" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=1" />
+    <meta name="apple-mobile-web-app-title" content="Rune Script" />
+    <link rel="manifest" href="/site.webmanifest?v=1" />
+
+    <!-- PWA -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <title>Rune Script — Build Websites. Build an Empire.</title>
+
+    <script>
+      // ── CLAUDE API ENDPOINT ──────────────────────────────────────────────
+      // Replace this URL with your Cloudflare Worker URL after deployment
+      // e.g. 'https://claude-proxy.your-username.workers.dev'
+      window.CLAUDE_ENDPOINT = 'https://runescript.its-the-prithivi-show.workers.dev';
+
+      // ── STORAGE POLYFILL ─────────────────────────────────────────────────
+      // Replaces Claude artifact window.storage with localStorage
+      // The app code doesn't need to change at all — this is transparent
+      window.storage = {
+        get: async function(key) {
+          var val = localStorage.getItem(key);
+          if (val === null) throw new Error('Key not found: ' + key);
+          return { key: key, value: val, shared: false };
+        },
+        set: async function(key, value) {
+          localStorage.setItem(key, String(value));
+          return { key: key, value: String(value), shared: false };
+        },
+        delete: async function(key) {
+          localStorage.removeItem(key);
+          return { key: key, deleted: true, shared: false };
+        },
+        list: async function(prefix) {
+          var keys = Object.keys(localStorage).filter(function(k) {
+            return !prefix || k.startsWith(prefix);
+          });
+          return { keys: keys, prefix: prefix || null, shared: false };
+        }
+      };
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
