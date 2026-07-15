@@ -3852,6 +3852,19 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
 
   useEffect(()=>{if(msgsRef.current)msgsRef.current.scrollTop=msgsRef.current.scrollHeight;},[msgs,activePage]);
 
+  // Persist built pages to localStorage so they survive a refresh — this state
+  // previously lived only in memory and was lost on navigation/reload.
+  useEffect(()=>{
+    window.storage.get('rs3_sitebuilder_pages').then(r=>{
+      if(r?.value){ try{ setPages(JSON.parse(r.value)); }catch(e){} }
+    }).catch(()=>{});
+  },[]);
+  useEffect(()=>{
+    if(Object.keys(pages).length>0){
+      window.storage.set('rs3_sitebuilder_pages',JSON.stringify(pages)).catch(()=>{});
+    }
+  },[pages]);
+
   useEffect(()=>{
     if(currentHtml&&iframeRef.current){
       const blob=new Blob([currentHtml],{type:'text/html'});
