@@ -3892,7 +3892,7 @@ function AIStudioPage({prospects,toast}){
       let prompt="";
       if(tool==="social")prompt=`Generate a week of ${opts.platform} content for ${biz} Tone: ${opts.tone}. 7 posts Mon-Sun. Each: caption (2-3 sentences), 3-5 hashtags, best time to post.`;
       else if(tool==="gbp")prompt=`Create optimized Google Business Profile content for ${biz} Include: 1) Description (750 chars max), 2) 5 Google Posts ideas, 3) 10 Q&A pairs, 4) 5 attribute suggestions.`;
-      else if(tool==="adcopy")prompt=`Write 3 ${opts.platform} ad variants for ${biz} Goal: ${opts.adGoal}. Each: headline (30 chars), primary text (125 chars), description (20 chars), CTA.`;
+      else if(tool==="adcopy")prompt=`Write 3 ${opts.platform} ad variants for ${biz} Goal: ${opts.adGoal}. Each: headline (30 chars), primary text (125 chars), description (20 chars), CTA. Then add a "Targeting Ideas" section: suggested audience demographics, 5-8 interest/behavior targeting keywords, and any geographic or lookalike-audience suggestions relevant to this business.`;
       else if(tool==="seo")prompt=`Write a ${opts.seoType} for ${biz} Make it genuinely useful with proper headings, meta description, and natural keyword usage.`;
       else if(tool==="brand")prompt=`Create a brand voice guide for ${biz} ${customInput?`Context: ${customInput}`:""} Include: voice in 3 words, tone description, 5 do/dont examples each, sample headline, sample post.`;
       else if(tool==="email")prompt=`Write an email newsletter for ${biz} ${customInput?`Goal: ${customInput}`:""} Include: 3 subject line options, preview text, opening hook, body (300 words), CTA.`;
@@ -3922,7 +3922,7 @@ function AIStudioPage({prospects,toast}){
         <div className="studio-content">
           <div className="studio-form">
             <div className="tool-title">{TOOLS.find(t=>t.id===tool)?.l}</div>
-            <div className="tool-sub">AI-powered content generation</div>
+            <div className="tool-sub">{tool==="adcopy"?"Text only — headlines, body copy, and targeting ideas. No image or video generation.":"AI-powered content generation"}</div>
             <div className="field"><label>Client</label><select className="inp" value={selClient} onChange={e=>setSelClient(e.target.value)}><option value="">— Select or enter below —</option>{prospects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
             {!selClient&&<div className="field"><label>{tool==="review"?"Paste the Review":"Business Details"}</label><textarea className="inp" rows={3} placeholder={tool==="review"?"Paste the Google review here…":"Business name, type, city…"} value={customInput} onChange={e=>setCustomInput(e.target.value)}/></div>}
             {tool==="social"&&<><div className="field"><label>Platform</label><div className="option-grid">{["Instagram","Facebook","LinkedIn","TikTok"].map(p=><div key={p} className={`opt-btn${opts.platform===p?" on":""}`} onClick={()=>setOpts(o=>({...o,platform:p}))}><div className="opt-btn-l">{p}</div></div>)}</div></div><div className="field"><label>Tone</label><div className="option-grid">{["Professional","Casual","Energetic","Trustworthy"].map(t=><div key={t} className={`opt-btn${opts.tone===t?" on":""}`} onClick={()=>setOpts(o=>({...o,tone:t}))}><div className="opt-btn-l">{t}</div></div>)}</div></div></>}
