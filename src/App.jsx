@@ -2085,8 +2085,7 @@ function DashboardPage({user,prospects,pitches,proposals=[],invoices=[],setPage,
   const weekChange=lastWeek===0?(thisWeek>0?'+∞':'+0'):(((thisWeek-lastWeek)/lastWeek)*100).toFixed(0);
   const METRICS=[{n:prospects.length,l:"Prospects Found",color:"metric-gold"},{n:active,l:"Active Deals",color:"metric-blue"},{n:closed,l:"Clients Closed",color:"metric-green"},{n:pitches.length,l:"Pitches Generated",color:"metric-purple"},{n:`${convRate}%`,l:"Conversion Rate",color:"metric-teal"}];
   return(
-    <div><div style={{marginBottom:14}}><div style={{fontFamily:"'Cinzel',serif",fontSize:'1.1rem',fontWeight:700,color:'#ddd8ce'}}>{(()=>{const h=new Date().getHours();return h<12?'Good morning':h<18?'Good afternoon':'Good evening';})()}{user?.name?`, ${user.name.split(' ')[0]}`:''}</div><div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.56rem',color:'#3a3848',letterSpacing:'1px'}}>{prospects.length} prospects · {(pitches||[]).length} pitches · {proposals?.length||0} proposals</div></div>
-
+    <div>
       {/* PIPELINE HEALTH */}
       {prospects.length>=3&&(()=>{
         const active=prospects.filter(p=>p.status==='Active').length;
