@@ -273,7 +273,7 @@ export default {
         body: JSON.stringify({
           ...body,
           model: 'claude-sonnet-5',
-          max_tokens: Math.min(body.max_tokens || 1400, 4000),
+          max_tokens: Math.min(body.max_tokens || 1400, 8000),
         }),
       });
       const data = await response.json();

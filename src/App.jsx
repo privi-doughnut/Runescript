@@ -3329,7 +3329,7 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
       ?`Build a complete, beautiful HTML page for the "${activePage}" section of this website. ${pageHint} Business/context: "${msg}". ${homeCtx} Match the visual style of the home page if provided. Return ONLY complete HTML starting with <!DOCTYPE html>.`
       :`Modify the ${activePage} page: "${msg}". Current HTML: ${(pages[activePage]||'').slice(0,2000)}... Return COMPLETE updated HTML only.`;
     try{
-      const raw=await callClaude(prompt,3500);
+      const raw=await callClaude(prompt,8000);
       const html=raw.replace(/```html|```/g,'').trim();
       setPages(p=>({...p,[activePage]:html}));
       setMsgs(m=>({...m,[activePage]:[...(m[activePage]||[]),{role:'ai',text:isFirst?`✦ ${activePage.charAt(0).toUpperCase()+activePage.slice(1)} page built. Ask me to change anything.`:`Updated. Check the preview.`}]}));
