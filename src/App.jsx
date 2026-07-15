@@ -4027,6 +4027,20 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
     setReorderSections(prev=>[...prev,{uid:uid(),tag:snippet.tag,label:snippet.label,html:snippet.html}]);
     setShowAddSection(false);
   };
+  const setSectionBg=(rowUid)=>{
+    const row=reorderSections.find(s=>s.uid===rowUid);
+    if(!row)return;
+    const color=window.prompt('Background color for this section (hex, e.g. #f5f5f5, or a CSS color name):','#ffffff');
+    if(!color)return;
+    setReorderSections(prev=>prev.map(s=>{
+      if(s.uid!==rowUid)return s;
+      const doc=new DOMParser().parseFromString(s.html,'text/html');
+      const el=doc.body.firstElementChild;
+      if(!el)return s;
+      el.style.background=color;
+      return {...s,html:el.outerHTML};
+    }));
+  };
 
   const downloadAll=()=>{
     const built=Object.entries(pages);
@@ -4397,6 +4411,7 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
                   <span style={{color:'#3a3848',fontSize:'.9rem'}}>⠿</span>
                   <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.56rem',letterSpacing:'1.5px',color:'#c9a84c',textTransform:'uppercase',minWidth:56}}>{s.tag}</span>
                   <span style={{fontSize:'.8rem',fontWeight:300,color:'#9a96a2',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.label}</span>
+                  <button className="btn btn-ghost btn-xs" title="Background color" onClick={()=>setSectionBg(s.uid)}>🎨</button>
                   <button className="btn btn-ghost btn-xs" title="Duplicate" onClick={()=>duplicateSection(s.uid)}>⧉</button>
                   <button className="btn btn-ghost btn-xs" title="Delete" onClick={()=>deleteSection(s.uid)}>✕</button>
                 </div>
