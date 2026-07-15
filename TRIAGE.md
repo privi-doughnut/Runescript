@@ -39,6 +39,10 @@ This is almost certainly the single highest-impact bug on this list — it break
 
 **Fix:** Point `callClaude` at `${workerUrl}/` (the Worker's existing Claude proxy endpoint, already correctly implemented and verified working via curl last session) instead of Anthropic directly.
 
+**Second layer found only after fixing the first:** once `callClaude` correctly reached the Worker, live end-to-end testing (real signup → AI Studio → Generate, on the actual production site) surfaced a *second*, previously-invisible bug: the Worker's hardcoded `model: 'claude-sonnet-4-20250514'` is deprecated — Anthropic returns `404 not_found_error`. This was completely masked by the first bug (the frontend never even reached the Worker to hit it) and would never have surfaced from a curl test against the Worker in isolation using a different model string. Fixed to `claude-sonnet-5`.
+
+**Fully verified live, end-to-end, in a real browser:** signed up a fresh account on `runescript.netlify.app`, opened AI Studio, filled in the Ad Copy tool, clicked Generate, and got back real AI-generated ad copy (HTTP 200, `model: claude-sonnet-5`, genuine multi-variant ad copy content). This is the actual product working end-to-end, not a code-review inference.
+
 ## Bug 4 — GitHub login error page after authenticating
 
 **Partially diagnosed, not fixable via app code.** Clicked "Continue with GitHub" and confirmed the redirect to GitHub's login page is correctly formed: real `client_id`, and `redirect_uri=https://ydxshxiemmdygumddzyx.supabase.co/auth/v1/callback` (Supabase's own fixed callback endpoint). This proves the GitHub OAuth provider **is** enabled and configured with valid credentials in Supabase — the failure is not "provider not enabled."
