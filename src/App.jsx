@@ -110,32 +110,47 @@ const sendEmail = async ({to, subject, html, from}) => {
   return data;
 };
 
-// Splits generated page HTML into its top-level <body> children so they can be
-// drag-reordered, then reassembles the HTML with the new order. Deliberately
-// structure-agnostic (works on any body children, not specific section tags)
-// since the HTML is AI-generated and its exact markup shape isn't guaranteed.
+// Splits generated page HTML into its top-level <body> children for the
+// section editor (reorder/add/delete/duplicate). Deliberately structure-
+// agnostic (works on any body children, not specific section tags) since the
+// HTML is AI-generated or template-authored and its exact shape isn't fixed.
+// Each section carries its own outerHTML so the editor can freely reorder,
+// clone, remove, or insert sections as plain array operations, then
+// reassemble — no fragile index bookkeeping into the original document.
 const parseSectionsFromHtml = (html) => {
   try {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const body = doc.body;
-    if (!body || body.children.length < 2) return null;
+    if (!body) return null;
     return Array.from(body.children).map((el, i) => {
       const heading = el.querySelector('h1,h2,h3');
       const text = (heading?.textContent || el.textContent || '').trim().slice(0, 50);
-      return { id: i, tag: el.tagName.toLowerCase(), label: text || `Section ${i + 1}` };
+      return { uid: uid(), tag: el.tagName.toLowerCase(), label: text || `Section ${i + 1}`, html: el.outerHTML };
     });
   } catch (e) {
     return null;
   }
 };
 
-const rebuildHtmlWithOrder = (html, order) => {
+const rebuildHtmlFromSections = (html, sections) => {
   const doc = new DOMParser().parseFromString(html, 'text/html');
-  const body = doc.body;
-  const children = Array.from(body.children);
-  order.forEach(i => { if (children[i]) body.appendChild(children[i]); });
+  doc.body.innerHTML = sections.map(s => s.html).join('');
   return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
 };
+
+// Small library of generic, structure-neutral section snippets for the "Add
+// Section" palette — plain inline styles so they render reasonably inside
+// any template regardless of that template's own CSS class names.
+const SECTION_SNIPPETS = [
+  {label:'Hero',tag:'section',html:'<section style="padding:80px 24px;text-align:center;background:#f5f5f5"><h1 style="font-size:2.4rem;margin-bottom:16px">Your Headline Here</h1><p style="font-size:1.1rem;color:#555;max-width:560px;margin:0 auto 24px">A short, compelling line about what you offer.</p><a href="#" style="display:inline-block;padding:14px 32px;background:#222;color:#fff;text-decoration:none;border-radius:4px">Call to Action</a></section>'},
+  {label:'About',tag:'section',html:'<section style="padding:70px 24px;max-width:800px;margin:0 auto"><h2 style="font-size:1.8rem;margin-bottom:16px">About Us</h2><p style="color:#555;line-height:1.7">Tell your story here — who you are, what you do, and why customers should choose you.</p></section>'},
+  {label:'Services',tag:'section',html:'<section style="padding:70px 24px"><h2 style="font-size:1.8rem;text-align:center;margin-bottom:36px">Our Services</h2><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:900px;margin:0 auto"><div style="padding:24px;border:1px solid #e0e0e0;border-radius:8px"><h3 style="margin-bottom:8px">Service One</h3><p style="color:#666;font-size:.9rem">Short description of this service.</p></div><div style="padding:24px;border:1px solid #e0e0e0;border-radius:8px"><h3 style="margin-bottom:8px">Service Two</h3><p style="color:#666;font-size:.9rem">Short description of this service.</p></div><div style="padding:24px;border:1px solid #e0e0e0;border-radius:8px"><h3 style="margin-bottom:8px">Service Three</h3><p style="color:#666;font-size:.9rem">Short description of this service.</p></div></div></section>'},
+  {label:'Gallery',tag:'section',html:'<section style="padding:70px 24px"><h2 style="font-size:1.8rem;text-align:center;margin-bottom:32px">Gallery</h2><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:960px;margin:0 auto"><div style="aspect-ratio:1;background:#ddd"></div><div style="aspect-ratio:1;background:#ddd"></div><div style="aspect-ratio:1;background:#ddd"></div><div style="aspect-ratio:1;background:#ddd"></div></div></section>'},
+  {label:'Testimonials',tag:'section',html:'<section style="padding:70px 24px;text-align:center;background:#f5f5f5"><h2 style="font-size:1.8rem;margin-bottom:28px">What Clients Say</h2><p style="font-size:1.2rem;font-style:italic;max-width:600px;margin:0 auto 16px;color:#444">"This business exceeded every expectation. Highly recommend."</p><div style="color:#888;font-size:.9rem">— A Happy Customer</div></section>'},
+  {label:'Pricing',tag:'section',html:'<section style="padding:70px 24px"><h2 style="font-size:1.8rem;text-align:center;margin-bottom:36px">Pricing</h2><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:900px;margin:0 auto;text-align:center"><div style="padding:32px 24px;border:1px solid #e0e0e0;border-radius:8px"><div style="font-weight:700;margin-bottom:8px">Basic</div><div style="font-size:2rem;margin-bottom:16px">$49</div><a href="#" style="color:#222">Choose Plan</a></div><div style="padding:32px 24px;border:2px solid #222;border-radius:8px"><div style="font-weight:700;margin-bottom:8px">Standard</div><div style="font-size:2rem;margin-bottom:16px">$99</div><a href="#" style="color:#222">Choose Plan</a></div><div style="padding:32px 24px;border:1px solid #e0e0e0;border-radius:8px"><div style="font-weight:700;margin-bottom:8px">Premium</div><div style="font-size:2rem;margin-bottom:16px">$199</div><a href="#" style="color:#222">Choose Plan</a></div></div></section>'},
+  {label:'Contact',tag:'section',html:'<section style="padding:70px 24px;text-align:center;background:#222;color:#fff"><h2 style="font-size:1.8rem;margin-bottom:16px">Get In Touch</h2><p style="color:#ccc;margin-bottom:24px">Ready to get started? Reach out today.</p><a href="tel:5551234567" style="display:inline-block;padding:14px 32px;background:#fff;color:#222;text-decoration:none;border-radius:4px">Call (555) 123-4567</a></section>'},
+  {label:'Footer',tag:'footer',html:'<footer style="padding:40px 24px;text-align:center;color:#888;font-size:.85rem;border-top:1px solid #e0e0e0">© 2026 Your Business. All rights reserved.</footer>'},
+];
 
 const createPaymentLink = async ({amount, description, clientName}) => {
   const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
@@ -3843,6 +3858,11 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
   const[showReorder,setShowReorder]=useState(false);
   const[reorderSections,setReorderSections]=useState([]);
   const[dragIdx,setDragIdx]=useState(null);
+  const[showAddSection,setShowAddSection]=useState(false);
+  const[editSectionUid,setEditSectionUid]=useState(null);
+  const[editMode,setEditMode]=useState(false);
+  const[history,setHistory]=useState({});
+  const[future,setFuture]=useState({});
   const[schemaLoading,setSchemaLoading]=useState(false);
   const msgsRef=useRef(null);
   const iframeRef=useRef(null);
@@ -3900,18 +3920,60 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
     setLoading(false);
   };
 
+  // Commits a new HTML string for the active page, pushing the previous
+  // version onto the undo stack and clearing any redo history (a fresh
+  // change invalidates whatever was previously "ahead" of it).
+  const commitPageChange=(newHtml)=>{
+    setHistory(h=>({...h,[activePage]:[...(h[activePage]||[]),currentHtml]}));
+    setFuture(f=>({...f,[activePage]:[]}));
+    setPages(p=>({...p,[activePage]:newHtml}));
+  };
+  const undo=()=>{
+    const stack=history[activePage]||[];
+    if(!stack.length)return;
+    const prev=stack[stack.length-1];
+    setHistory(h=>({...h,[activePage]:stack.slice(0,-1)}));
+    setFuture(f=>({...f,[activePage]:[...(f[activePage]||[]),currentHtml]}));
+    setPages(p=>({...p,[activePage]:prev}));
+  };
+  const redo=()=>{
+    const stack=future[activePage]||[];
+    if(!stack.length)return;
+    const next=stack[stack.length-1];
+    setFuture(f=>({...f,[activePage]:stack.slice(0,-1)}));
+    setHistory(h=>({...h,[activePage]:[...(h[activePage]||[]),currentHtml]}));
+    setPages(p=>({...p,[activePage]:next}));
+  };
+
   const openReorder=()=>{
     const sections=parseSectionsFromHtml(currentHtml);
-    if(!sections){toast('Not enough distinct sections to reorder on this page.','info');return;}
+    if(!sections){toast('Nothing to edit on this page yet.','info');return;}
     setReorderSections(sections);
     setShowReorder(true);
   };
   const saveReorder=()=>{
-    const order=reorderSections.map(s=>s.id);
-    const newHtml=rebuildHtmlWithOrder(currentHtml,order);
-    setPages(p=>({...p,[activePage]:newHtml}));
+    const newHtml=rebuildHtmlFromSections(currentHtml,reorderSections);
+    commitPageChange(newHtml);
     setShowReorder(false);
-    toast('Section order updated.','success');
+    toast('Sections updated.','success');
+  };
+  const deleteSection=(rowUid)=>{
+    if(reorderSections.length<=1){toast("Can't delete the last section — edit or replace it instead.",'info');return;}
+    setReorderSections(prev=>prev.filter(s=>s.uid!==rowUid));
+  };
+  const duplicateSection=(rowUid)=>{
+    setReorderSections(prev=>{
+      const idx=prev.findIndex(s=>s.uid===rowUid);
+      if(idx===-1)return prev;
+      const clone={...prev[idx],uid:uid()};
+      const arr=[...prev];
+      arr.splice(idx+1,0,clone);
+      return arr;
+    });
+  };
+  const addSection=(snippet)=>{
+    setReorderSections(prev=>[...prev,{uid:uid(),tag:snippet.tag,label:snippet.label,html:snippet.html}]);
+    setShowAddSection(false);
   };
 
   const downloadAll=()=>{
@@ -4044,7 +4106,9 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
           {builtCount>0&&<span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.58rem',letterSpacing:'2px',color:'#5a9070',textTransform:'uppercase'}}>{builtCount} page{builtCount>1?'s':''} built</span>}
           {builtCount>0&&<button className="btn btn-ghost btn-sm" onClick={downloadAll}>↓ Download All</button>}
           {currentHtml&&<button className="btn btn-ghost btn-sm" onClick={duplicatePage}>Clone Page</button>}
-          {currentHtml&&<button className="btn btn-ghost btn-sm" onClick={openReorder}>🧩 Reorder Sections</button>}
+          {currentHtml&&(history[activePage]||[]).length>0&&<button className="btn btn-ghost btn-sm" onClick={undo} title="Undo">↶ Undo</button>}
+          {currentHtml&&(future[activePage]||[]).length>0&&<button className="btn btn-ghost btn-sm" onClick={redo} title="Redo">↷ Redo</button>}
+          {currentHtml&&<button className="btn btn-gold btn-sm" onClick={openReorder}>🧩 Edit Sections</button>}
           {currentHtml&&<button className="btn btn-ghost btn-sm" onClick={generateSchema}>{showSchema?'Hide Preview':'Google Preview'}</button>}
           {builtCount>0&&<button className="btn btn-gold btn-sm" onClick={deployToGitHub} disabled={deploying}>{deploying?<><Spinner/>Deploying…</>:'Deploy to GitHub →'}</button>}
         </div>
@@ -4265,25 +4329,41 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
 
       {showReorder&&(
         <div className="modal-bg" onClick={e=>e.target.className==="modal-bg"&&setShowReorder(false)}>
-          <div className="modal" style={{maxWidth:480}}>
-            <div className="modal-title">Reorder Sections</div>
-            <div className="modal-sub">Drag to reorder — applies to the {activePage} page only.</div>
-            <div style={{display:'flex',flexDirection:'column',gap:6,margin:'12px 0'}}>
+          <div className="modal" style={{maxWidth:560}}>
+            <div className="modal-title">Edit Sections</div>
+            <div className="modal-sub">Drag to reorder, duplicate, delete, or add sections — applies to the {activePage} page only.</div>
+            <div style={{display:'flex',flexDirection:'column',gap:6,margin:'12px 0',maxHeight:360,overflowY:'auto'}}>
               {reorderSections.map((s,i)=>(
-                <div key={s.id} draggable
+                <div key={s.uid} draggable
                   onDragStart={()=>setDragIdx(i)}
                   onDragOver={e=>e.preventDefault()}
                   onDrop={()=>{if(dragIdx===null||dragIdx===i)return;setReorderSections(prev=>{const arr=[...prev];const[moved]=arr.splice(dragIdx,1);arr.splice(i,0,moved);return arr;});setDragIdx(null);}}
                   style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:'#0a0a14',border:'1px solid rgba(201,168,76,.1)',cursor:'grab'}}>
                   <span style={{color:'#3a3848',fontSize:'.9rem'}}>⠿</span>
-                  <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.56rem',letterSpacing:'1.5px',color:'#c9a84c',textTransform:'uppercase',minWidth:60}}>{s.tag}</span>
+                  <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.56rem',letterSpacing:'1.5px',color:'#c9a84c',textTransform:'uppercase',minWidth:56}}>{s.tag}</span>
                   <span style={{fontSize:'.8rem',fontWeight:300,color:'#9a96a2',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.label}</span>
+                  <button className="btn btn-ghost btn-xs" title="Duplicate" onClick={()=>duplicateSection(s.uid)}>⧉</button>
+                  <button className="btn btn-ghost btn-xs" title="Delete" onClick={()=>deleteSection(s.uid)}>✕</button>
                 </div>
               ))}
+              {reorderSections.length===0&&<div style={{textAlign:'center',padding:'20px 0',fontSize:'.8rem',color:'#3a3848'}}>No sections yet — add one below.</div>}
             </div>
+            {!showAddSection?(
+              <button className="btn btn-ghost btn-sm" style={{width:'100%',marginBottom:12}} onClick={()=>setShowAddSection(true)}>+ Add Section</button>
+            ):(
+              <div style={{marginBottom:12}}>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.56rem',letterSpacing:'1.5px',textTransform:'uppercase',color:'#3a3848',marginBottom:8}}>Pick a section to add</div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:6}}>
+                  {SECTION_SNIPPETS.map(sn=>(
+                    <button key={sn.label} className="btn btn-ghost btn-xs" onClick={()=>addSection(sn)}>{sn.label}</button>
+                  ))}
+                </div>
+                <button className="btn btn-ghost btn-xs" style={{marginTop:8}} onClick={()=>setShowAddSection(false)}>Cancel</button>
+              </div>
+            )}
             <div style={{display:'flex',gap:10}}>
-              <button className="btn btn-gold" style={{flex:1}} onClick={saveReorder}>Save Order</button>
-              <button className="btn btn-ghost" onClick={()=>setShowReorder(false)}>Cancel</button>
+              <button className="btn btn-gold" style={{flex:1}} onClick={saveReorder}>Save Changes</button>
+              <button className="btn btn-ghost" onClick={()=>{setShowReorder(false);setShowAddSection(false);}}>Cancel</button>
             </div>
           </div>
         </div>
