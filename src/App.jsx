@@ -3936,7 +3936,6 @@ function AIStudioPage({prospects,toast}){
 
 // ── MARKETPLACE ────────────────────────────────────────────────────────────
 function MarketplacePage({toast}){
-  const[previewTpl,setPreviewTpl]=useState(null);
   const[tab,setTab]=useState("browse");
   const[catFilter,setCatFilter]=useState("All");
   const[searchQ,setSearchQ]=useState("");
