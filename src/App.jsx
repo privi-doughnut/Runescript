@@ -7978,6 +7978,7 @@ export default function RuneScript(){
       <ToastDock toasts={toasts}/>
       {showShortcuts&&<ShortcutsOverlay onClose={()=>setShowShortcuts(false)}/>}
       {showPalette&&<CommandPalette setPage={setPage} prospects={prospects} onClose={()=>setShowPalette(false)} toast={toast}/>}
+      {showOnboarding&&<OnboardingSlideshow userName={user?.name} onClose={()=>{setShowOnboarding(false);window.storage.set('rs3_onboarded','true').catch(()=>{});}}/>}
       {screen==='app'&&<SageAdvisor page={page} user={user} prospects={prospects} pitches={pitches} invoices={invoices} setPage={setPage} toast={toast}/>}
     </div>
   );
