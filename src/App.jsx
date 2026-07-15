@@ -3272,6 +3272,551 @@ function PitchPage({prospects,pitches,addPitch,updatePitch,toast}){
   );
 }
 
+// ── SITE TEMPLATES ─────────────────────────────────────────────────────────
+// Real, hand-built, structurally distinct starter templates — not prompt
+// variations. Each has a genuinely different nav pattern, hero layout,
+// section mix, and typography/color system. Business details are generic
+// placeholders; the user customizes via the existing chat-modify flow after
+// loading one, reusing already-working infrastructure instead of building a
+// separate substitution engine.
+const SITE_TEMPLATES = [
+{id:'restaurant',name:'Restaurant',emoji:'🍽️',desc:'Full-bleed imagery, menu showcase, reservation-first.',html:`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La Brasa | Wood-Fired Kitchen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#1a1410;--cream:#f7f1e6;--ember:#c3502f;--gold:#b8935a;--dim:#6b5f52}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Jost',sans-serif;color:var(--ink);background:var(--cream);line-height:1.65}
+h1,h2,h3{font-family:'Playfair Display',serif}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1160px;margin:0 auto;padding:0 28px}
+.btn{display:inline-block;padding:15px 34px;border-radius:2px;font-size:.78rem;letter-spacing:2px;text-transform:uppercase;font-weight:500;cursor:pointer;border:1px solid var(--ember);transition:.25s}
+.btn-fill{background:var(--ember);color:#fff}
+.btn-fill:hover{background:#a3421f}
+.btn-out{color:var(--cream);border-color:rgba(247,241,230,.5)}
+.btn-out:hover{border-color:#fff}
+nav{position:absolute;top:0;left:0;right:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:26px 40px}
+.logo{font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:700;color:#fff;letter-spacing:1px}
+.navlinks{display:flex;gap:36px;font-size:.76rem;letter-spacing:2px;text-transform:uppercase;color:#fff}
+.hero{height:100vh;min-height:640px;position:relative;display:flex;align-items:center;background:linear-gradient(180deg,rgba(20,14,10,.35),rgba(20,14,10,.75)),repeating-linear-gradient(135deg,#2b1c14 0 40px,#241710 40px 80px)}
+.hero-in{position:relative;color:#fff;max-width:640px;padding:0 40px}
+.hero-tag{font-size:.76rem;letter-spacing:4px;text-transform:uppercase;color:var(--gold);margin-bottom:18px}
+.hero h1{font-size:clamp(2.6rem,6vw,4.6rem);line-height:1.03;font-weight:900;margin-bottom:20px}
+.hero p{font-size:1.05rem;color:rgba(255,255,255,.8);margin-bottom:32px;max-width:480px}
+.hero-btns{display:flex;gap:14px}
+.strip{background:var(--ink);color:var(--cream);padding:18px 0;text-align:center;font-size:.8rem;letter-spacing:2px;text-transform:uppercase}
+.section{padding:100px 0}
+.section-head{text-align:center;max-width:600px;margin:0 auto 60px}
+.section-tag{font-size:.74rem;letter-spacing:3px;text-transform:uppercase;color:var(--ember);margin-bottom:14px}
+.section-head h2{font-size:clamp(2rem,4vw,2.8rem);margin-bottom:14px}
+.section-head p{color:var(--dim)}
+.menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:50px 70px}
+.menu-cat h3{font-size:1rem;letter-spacing:2px;text-transform:uppercase;color:var(--ember);margin-bottom:20px;padding-bottom:10px;border-bottom:2px solid var(--ember)}
+.menu-item{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}
+.menu-item-name{font-weight:500}
+.menu-item-desc{font-size:.82rem;color:var(--dim);margin-top:3px}
+.menu-item-price{font-family:'Playfair Display',serif;color:var(--ember);font-weight:700;white-space:nowrap}
+.about{background:var(--ink);color:var(--cream)}
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.about-img{aspect-ratio:4/5;background:repeating-linear-gradient(45deg,#2b1c14 0 30px,#241710 30px 60px);border:1px solid rgba(184,147,90,.3)}
+.about h2{color:var(--cream)}
+.about p{color:rgba(247,241,230,.75);margin-bottom:16px}
+.stats{display:flex;gap:40px;margin-top:32px}
+.stat-n{font-family:'Playfair Display',serif;font-size:2.2rem;color:var(--gold);font-weight:700}
+.stat-l{font-size:.72rem;letter-spacing:1.5px;text-transform:uppercase;color:rgba(247,241,230,.6)}
+.gallery{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.gallery div{aspect-ratio:1;background:repeating-linear-gradient(60deg,#e8dcc6 0 24px,#ddd0b6 24px 48px)}
+.testimonial{text-align:center;max-width:720px;margin:0 auto;padding:0 40px}
+.testimonial p{font-family:'Playfair Display',serif;font-size:1.5rem;font-style:italic;line-height:1.5;margin-bottom:24px}
+.testimonial .who{font-size:.78rem;letter-spacing:2px;text-transform:uppercase;color:var(--ember)}
+.cta{background:var(--ember);color:#fff;text-align:center;padding:90px 0}
+.cta h2{color:#fff;margin-bottom:16px}
+.cta p{color:rgba(255,255,255,.85);margin-bottom:32px}
+footer{background:var(--ink);color:rgba(247,241,230,.65);padding:60px 0 30px}
+.foot-grid{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:40px;margin-bottom:40px}
+.foot-grid h4{color:var(--cream);font-size:.78rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px}
+.foot-grid p,.foot-grid a{display:block;font-size:.86rem;color:rgba(247,241,230,.6);margin-bottom:8px}
+.foot-bottom{text-align:center;font-size:.74rem;padding-top:24px;border-top:1px solid rgba(247,241,230,.1);color:rgba(247,241,230,.4)}
+@media(max-width:760px){.menu-grid,.about-grid{grid-template-columns:1fr}.gallery{grid-template-columns:repeat(2,1fr)}.navlinks{display:none}.stats{gap:24px}}
+</style></head>
+<body>
+<nav><div class="logo">La Brasa</div><div class="navlinks"><a href="#menu">Menu</a><a href="#about">Our Story</a><a href="#gallery">Gallery</a><a href="#contact">Reservations</a></div></nav>
+<header class="hero"><div class="hero-in">
+<div class="hero-tag">Wood-Fired · Est. 2012</div>
+<h1>Where Fire Meets Flavor</h1>
+<p>Live-fire cooking, seasonal ingredients, and a table that always has room for one more. Downtown's favorite kitchen for eight years running.</p>
+<div class="hero-btns"><a href="#contact" class="btn btn-fill">Reserve a Table</a><a href="#menu" class="btn btn-out">View Menu</a></div>
+</div></header>
+<div class="strip">Open Tue–Sun, 5pm–11pm · Walk-ins welcome · Private events available</div>
+<section class="section" id="menu"><div class="wrap">
+<div class="section-head"><div class="section-tag">The Menu</div><h2>Seasonal, Simple, Fire-Cooked</h2><p>A short menu, done exceptionally well. Everything changes with the season and the fire.</p></div>
+<div class="menu-grid">
+<div class="menu-cat"><h3>Starters</h3>
+<div class="menu-item"><div><div class="menu-item-name">Charred Octopus</div><div class="menu-item-desc">Smoked paprika, fingerling potato, salsa verde</div></div><div class="menu-item-price">$19</div></div>
+<div class="menu-item"><div><div class="menu-item-name">Burrata & Fire Peach</div><div class="menu-item-desc">Basil oil, aged balsamic, grilled sourdough</div></div><div class="menu-item-price">$16</div></div>
+<div class="menu-item"><div><div class="menu-item-name">Embered Oysters</div><div class="menu-item-desc">Half dozen, brown butter mignonette</div></div><div class="menu-item-price">$22</div></div>
+</div>
+<div class="menu-cat"><h3>Mains</h3>
+<div class="menu-item"><div><div class="menu-item-name">Whole Roasted Branzino</div><div class="menu-item-desc">Citrus, fennel, chili oil</div></div><div class="menu-item-price">$34</div></div>
+<div class="menu-item"><div><div class="menu-item-name">Dry-Aged Ribeye</div><div class="menu-item-desc">24oz, bone marrow butter, embered onion</div></div><div class="menu-item-price">$58</div></div>
+<div class="menu-item"><div><div class="menu-item-name">Wood-Fired Mushroom Risotto</div><div class="menu-item-desc">Wild mushroom, parmesan, truffle</div></div><div class="menu-item-price">$27</div></div>
+</div>
+</div>
+</div></section>
+<section class="about" id="about"><div class="wrap about-grid">
+<div class="about-img"></div>
+<div><h2>A Kitchen Built Around the Fire</h2>
+<p>La Brasa started with one wood-fired hearth and a simple idea: cook everything the way it's been done for a thousand years. No shortcuts, no gas lines — just fire, smoke, and technique passed down from chef to cook.</p>
+<p>Today the same hearth anchors our open kitchen, where every dish still starts and ends with the flame.</p>
+<div class="stats"><div><div class="stat-n">12+</div><div class="stat-l">Years Open</div></div><div><div class="stat-n">4.9</div><div class="stat-l">Average Rating</div></div><div><div class="stat-n">40k+</div><div class="stat-l">Guests Served</div></div></div>
+</div>
+</div></section>
+<section class="section" id="gallery"><div class="wrap">
+<div class="section-head"><div class="section-tag">Gallery</div><h2>A Taste of the Room</h2></div>
+<div class="gallery"><div></div><div></div><div></div><div></div></div>
+</div></section>
+<section class="section"><div class="wrap testimonial">
+<p>"Best meal we've had in the city in years. The octopus alone is worth the trip — and the room feels like a special occasion every time."</p>
+<div class="who">— Local Eats Magazine</div>
+</div></section>
+<section class="cta" id="contact"><div class="wrap">
+<h2>Reserve Your Table</h2>
+<p>Tuesday through Sunday, 5pm to 11pm. Parties of 8+ call ahead.</p>
+<a href="tel:5551234567" class="btn btn-out" style="border-color:#fff">Call (555) 123-4567</a>
+</div></section>
+<footer><div class="wrap">
+<div class="foot-grid">
+<div><h4>La Brasa</h4><p>412 Ember Street<br>Downtown, ST 00000</p></div>
+<div><h4>Hours</h4><p>Tue–Thu: 5pm–10pm</p><p>Fri–Sat: 5pm–11pm</p><p>Sun: 4pm–9pm</p></div>
+<div><h4>Connect</h4><a href="#">Instagram</a><a href="#">Reservations</a><a href="#">Private Events</a></div>
+</div>
+<div class="foot-bottom">© 2026 La Brasa. All rights reserved.</div>
+</div></footer>
+</body></html>`},
+{id:'trades',name:'Trades / Contractor',emoji:'🔧',desc:'Bold split hero, emergency CTA, trust badges, service-area focus.',html:`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ironclad Plumbing & HVAC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0c2540;--navy2:#123258;--orange:#f26522;--ice:#f4f7fa;--slate:#5b6b7c}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;color:var(--navy);background:#fff;line-height:1.6}
+h1,h2,h3{font-family:'Archivo Black',sans-serif;font-weight:400}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:16px 30px;border-radius:4px;font-weight:700;font-size:.92rem;cursor:pointer;border:none}
+.btn-fill{background:var(--orange);color:#fff}
+.btn-out{background:transparent;border:2px solid #fff;color:#fff}
+.topbar{background:var(--navy);color:#cdd8e3;padding:9px 0;font-size:.8rem}
+.topbar .wrap{display:flex;justify-content:space-between}
+nav{display:flex;align-items:center;justify-content:space-between;padding:20px 28px}
+.logo{font-family:'Archivo Black',sans-serif;font-size:1.3rem;color:var(--navy)}
+.logo span{color:var(--orange)}
+.navlinks{display:flex;gap:32px;font-weight:600;font-size:.9rem}
+.hero{background:var(--navy);color:#fff;position:relative;overflow:hidden}
+.hero-grid{display:grid;grid-template-columns:1.1fr .9fr;align-items:center;min-height:560px;gap:40px}
+.hero-badge{display:inline-block;background:var(--orange);padding:6px 14px;border-radius:3px;font-size:.76rem;font-weight:800;letter-spacing:1px;margin-bottom:20px}
+.hero h1{font-size:clamp(2.2rem,4.6vw,3.4rem);line-height:1.08;margin-bottom:20px}
+.hero p{color:#c3d2e0;font-size:1.05rem;max-width:480px;margin-bottom:30px}
+.hero-btns{display:flex;gap:14px;flex-wrap:wrap}
+.hero-visual{aspect-ratio:4/5;background:repeating-linear-gradient(45deg,var(--navy2) 0 20px,#0f2c4e 20px 40px);border-radius:6px;position:relative}
+.hero-visual::after{content:'24/7';position:absolute;bottom:24px;left:24px;background:var(--orange);color:#fff;padding:14px 20px;border-radius:6px;font-family:'Archivo Black',sans-serif;font-size:1.3rem}
+.trust-strip{background:var(--ice);padding:26px 0}
+.trust-grid{display:flex;justify-content:space-around;flex-wrap:wrap;gap:20px;text-align:center;font-weight:700;font-size:.86rem;color:var(--slate)}
+.section{padding:90px 0}
+.section-head{max-width:640px;margin-bottom:50px}
+.section-tag{color:var(--orange);font-weight:800;font-size:.8rem;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px}
+.section-head h2{font-size:clamp(1.9rem,3.6vw,2.6rem)}
+.services-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.svc-card{border:1px solid #e4eaf0;border-radius:8px;padding:32px 26px}
+.svc-icon{width:52px;height:52px;border-radius:10px;background:var(--navy);color:var(--orange);display:flex;align-items:center;justify-content:center;font-family:'Archivo Black',sans-serif;font-size:1.3rem;margin-bottom:18px}
+.svc-card h3{font-family:'Inter',sans-serif;font-weight:800;font-size:1.05rem;margin-bottom:8px}
+.svc-card p{color:var(--slate);font-size:.9rem}
+.split{background:var(--ice)}
+.split-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.split-img{aspect-ratio:5/4;background:repeating-linear-gradient(-45deg,#dde6ee 0 22px,#d0dce6 22px 44px);border-radius:8px}
+.check-list{list-style:none;margin-top:20px}
+.check-list li{display:flex;gap:12px;margin-bottom:12px;font-weight:500}
+.check-list li::before{content:'✓';background:var(--orange);color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0}
+.quote-cta{background:var(--navy);color:#fff;padding:70px 0;text-align:center}
+.quote-cta h2{color:#fff;margin-bottom:14px}
+.quote-cta p{color:#c3d2e0;margin-bottom:30px}
+footer{background:#081a2e;color:#8fa3b8;padding:50px 0 24px;font-size:.86rem}
+.foot-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:36px;margin-bottom:36px}
+.foot-grid h4{color:#fff;font-size:.8rem;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px}
+.foot-grid a,.foot-grid p{display:block;margin-bottom:8px}
+.foot-bottom{border-top:1px solid #16324f;padding-top:20px;text-align:center;font-size:.78rem}
+@media(max-width:800px){.hero-grid,.split-grid{grid-template-columns:1fr}.services-grid{grid-template-columns:1fr 1fr}.navlinks{display:none}.foot-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.services-grid{grid-template-columns:1fr}}
+</style></head>
+<body>
+<div class="topbar"><div class="wrap"><span>📍 Serving the Greater Metro Area</span><span>☎ (555) 987-6543</span></div></div>
+<nav><div class="logo">IRON<span>CLAD</span></div><div class="navlinks"><a href="#services">Services</a><a href="#about">Why Us</a><a href="#contact">Get a Quote</a></div><a href="#contact" class="btn btn-fill" style="padding:11px 22px">Call Now</a></nav>
+<header class="hero"><div class="wrap"><div class="hero-grid">
+<div><div class="hero-badge">⚡ 24/7 EMERGENCY SERVICE</div>
+<h1>Plumbing & HVAC Done Right, The First Time</h1>
+<p>Licensed, bonded, and insured. Family-owned since 1998. No overtime charges, ever — and every job backed by our 100% satisfaction guarantee.</p>
+<div class="hero-btns"><a href="#contact" class="btn btn-fill">Get a Free Quote</a><a href="tel:5559876543" class="btn btn-out">☎ (555) 987-6543</a></div>
+</div>
+<div class="hero-visual"></div>
+</div></div></header>
+<div class="trust-strip"><div class="wrap trust-grid">
+<div>⭐ 4.9 Rating (600+ Reviews)</div><div>🛡️ Licensed & Insured</div><div>🏆 25+ Years in Business</div><div>💳 Financing Available</div>
+</div></div>
+<section class="section" id="services"><div class="wrap">
+<div class="section-head"><div class="section-tag">What We Do</div><h2>Full-Service Plumbing & HVAC</h2></div>
+<div class="services-grid">
+<div class="svc-card"><div class="svc-icon">🚿</div><h3>Emergency Repairs</h3><p>Burst pipes, leaks, and no-heat calls — we're on our way within the hour.</p></div>
+<div class="svc-card"><div class="svc-icon">🔥</div><h3>Water Heater Install</h3><p>Tank and tankless systems, installed and warrantied by our certified team.</p></div>
+<div class="svc-card"><div class="svc-icon">🌀</div><h3>Drain Cleaning</h3><p>Camera inspection and hydro-jetting to clear even the toughest clogs.</p></div>
+<div class="svc-card"><div class="svc-icon">❄️</div><h3>AC Installation</h3><p>Energy-efficient systems sized right for your home, installed in a day.</p></div>
+<div class="svc-card"><div class="svc-icon">🌡️</div><h3>Heating Repair</h3><p>Furnace and heat pump repair from technicians who know every make and model.</p></div>
+<div class="svc-card"><div class="svc-icon">📋</div><h3>Maintenance Plans</h3><p>Annual tune-ups that catch small problems before they become expensive ones.</p></div>
+</div>
+</div></section>
+<section class="split" id="about"><div class="wrap split-grid">
+<div class="split-img"></div>
+<div><div class="section-tag">Why Homeowners Choose Us</div><h2>Straight Answers, Fair Pricing, No Surprises</h2>
+<ul class="check-list">
+<li>Upfront, flat-rate pricing before any work begins</li>
+<li>Background-checked, uniformed technicians</li>
+<li>Same-day service for most repairs</li>
+<li>2-year warranty on all installations</li>
+</ul>
+</div>
+</div></div></section>
+<section class="quote-cta" id="contact"><div class="wrap">
+<h2>Get Your Free Quote Today</h2>
+<p>Call now or request a callback — most quotes take less than 10 minutes.</p>
+<a href="tel:5559876543" class="btn btn-fill">☎ Call (555) 987-6543</a>
+</div></section>
+<footer><div class="wrap">
+<div class="foot-grid">
+<div><h4>Ironclad Plumbing & HVAC</h4><p>1420 Industrial Pkwy<br>Metro City, ST 00000</p></div>
+<div><h4>Hours</h4><p>Mon–Fri: 7am–7pm</p><p>Sat–Sun: 8am–5pm</p><p>Emergency: 24/7</p></div>
+<div><h4>Company</h4><a href="#services">Services</a><a href="#about">About</a><a href="#contact">Contact</a></div>
+</div>
+<div class="foot-bottom">© 2026 Ironclad Plumbing & HVAC. Licensed & Insured.</div>
+</div></footer>
+</body></html>`},
+{id:'salon',name:'Salon / Spa',emoji:'💆',desc:'Centered elegant hero, service menu, gallery, team, soft palette.',html:`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumière Salon & Spa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Poppins:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--blush:#f4e3e0;--rose:#c98f88;--gold:#b89968;--ink:#3a2e2c;--cream:#fdf9f6;--dim:#8a7a76}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Poppins',sans-serif;color:var(--ink);background:var(--cream);line-height:1.7;font-weight:300}
+h1,h2,h3{font-family:'Cormorant Garamond',serif;font-weight:600}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+.btn{display:inline-block;padding:15px 36px;border-radius:30px;font-size:.78rem;letter-spacing:2px;text-transform:uppercase;cursor:pointer;transition:.25s}
+.btn-fill{background:var(--rose);color:#fff}
+.btn-fill:hover{background:#b57a72}
+.btn-out{border:1px solid var(--rose);color:var(--rose)}
+nav{display:flex;flex-direction:column;align-items:center;padding:30px 28px 10px;text-align:center}
+.logo{font-family:'Cormorant Garamond',serif;font-size:1.9rem;font-weight:700;letter-spacing:3px;margin-bottom:14px}
+.navlinks{display:flex;gap:34px;font-size:.76rem;letter-spacing:2px;text-transform:uppercase;color:var(--dim)}
+.hero{text-align:center;padding:70px 28px 90px}
+.hero-tag{font-size:.78rem;letter-spacing:4px;text-transform:uppercase;color:var(--rose);margin-bottom:18px}
+.hero h1{font-size:clamp(2.4rem,6vw,4rem);line-height:1.15;margin-bottom:22px;max-width:760px;margin-left:auto;margin-right:auto}
+.hero p{color:var(--dim);max-width:520px;margin:0 auto 34px}
+.hero-visual{margin-top:50px;display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:14px;height:280px}
+.hero-visual div{border-radius:16px;background:repeating-linear-gradient(120deg,var(--blush) 0 26px,#efd4d0 26px 52px)}
+.hero-visual div:nth-child(2){background:repeating-linear-gradient(120deg,#e8d4ce 0 26px,#ddc4bd 26px 52px)}
+.section{padding:90px 0}
+.section-head{text-align:center;max-width:600px;margin:0 auto 56px}
+.section-tag{font-size:.76rem;letter-spacing:3px;text-transform:uppercase;color:var(--rose);margin-bottom:12px}
+.section-head h2{font-size:clamp(2rem,4vw,2.6rem)}
+.menu-tabs{display:flex;justify-content:center;gap:10px;margin-bottom:44px;flex-wrap:wrap}
+.menu-tab{padding:9px 22px;border-radius:20px;border:1px solid var(--blush);font-size:.8rem;letter-spacing:1px}
+.menu-tab.on{background:var(--rose);color:#fff;border-color:var(--rose)}
+.menu-list{max-width:680px;margin:0 auto}
+.menu-row{display:flex;justify-content:space-between;align-items:baseline;padding:18px 0;border-bottom:1px dashed var(--blush)}
+.menu-row-name{font-family:'Cormorant Garamond',serif;font-size:1.2rem;font-weight:600}
+.menu-row-desc{color:var(--dim);font-size:.84rem;margin-top:3px}
+.menu-row-price{font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:var(--rose);white-space:nowrap;padding-left:20px}
+.gallery-band{background:var(--blush)}
+.gallery{display:grid;grid-template-columns:repeat(5,1fr);gap:3px}
+.gallery div{aspect-ratio:1;background:repeating-linear-gradient(135deg,#eed9d5 0 20px,#e6c9c4 20px 40px)}
+.team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:36px;text-align:center}
+.team-photo{aspect-ratio:1;border-radius:50%;background:repeating-linear-gradient(60deg,var(--blush) 0 16px,#eed9d5 16px 32px);margin:0 auto 18px;max-width:180px}
+.team-grid h3{font-size:1.2rem}
+.team-grid .role{color:var(--rose);font-size:.78rem;letter-spacing:1.5px;text-transform:uppercase;margin-top:4px}
+.cta-band{background:var(--rose);color:#fff;text-align:center;padding:80px 0}
+.cta-band h2{color:#fff;margin-bottom:16px}
+.cta-band p{color:rgba(255,255,255,.85);margin-bottom:30px}
+.cta-band .btn-out{border-color:#fff;color:#fff}
+footer{padding:50px 0 24px;text-align:center;color:var(--dim);font-size:.86rem}
+footer .flinks{display:flex;justify-content:center;gap:24px;margin:16px 0}
+@media(max-width:760px){.hero-visual,.gallery{grid-template-columns:repeat(3,1fr)}.team-grid{grid-template-columns:1fr}.navlinks{display:none}}
+</style></head>
+<body>
+<nav><div class="logo">LUMIÈRE</div><div class="navlinks"><a href="#services">Services</a><a href="#gallery">Gallery</a><a href="#team">Our Team</a><a href="#book">Book Now</a></div></nav>
+<header class="hero">
+<div class="hero-tag">Salon & Spa · Est. 2015</div>
+<h1>Where Beauty Meets Serenity</h1>
+<p>A calm, considered space for hair, skin, and self-care — led by stylists who listen first and cut second.</p>
+<a href="#book" class="btn btn-fill">Book Your Appointment</a>
+<div class="hero-visual"><div></div><div></div><div></div></div>
+</header>
+<section class="section" id="services"><div class="wrap">
+<div class="section-head"><div class="section-tag">Services & Pricing</div><h2>Our Menu</h2></div>
+<div class="menu-tabs"><div class="menu-tab on">Hair</div><div class="menu-tab">Skin</div><div class="menu-tab">Nails</div><div class="menu-tab">Massage</div></div>
+<div class="menu-list">
+<div class="menu-row"><div><div class="menu-row-name">Signature Cut & Style</div><div class="menu-row-desc">Consultation, wash, cut, blow-dry</div></div><div class="menu-row-price">$85</div></div>
+<div class="menu-row"><div><div class="menu-row-name">Balayage</div><div class="menu-row-desc">Hand-painted color, gloss, style</div></div><div class="menu-row-price">$220</div></div>
+<div class="menu-row"><div><div class="menu-row-name">Keratin Treatment</div><div class="menu-row-desc">Smoothing treatment, 3–5 month results</div></div><div class="menu-row-price">$275</div></div>
+<div class="menu-row"><div><div class="menu-row-name">Bridal Package</div><div class="menu-row-desc">Trial + day-of hair and makeup</div></div><div class="menu-row-price">from $450</div></div>
+</div>
+</div></section>
+<section class="gallery-band" id="gallery"><div class="gallery"><div></div><div></div><div></div><div></div><div></div></div></section>
+<section class="section" id="team"><div class="wrap">
+<div class="section-head"><div class="section-tag">Meet the Team</div><h2>Your Stylists</h2></div>
+<div class="team-grid">
+<div><div class="team-photo"></div><h3>Amara Reyes</h3><div class="role">Owner & Colorist</div></div>
+<div><div class="team-photo"></div><h3>Jordan Kim</h3><div class="role">Senior Stylist</div></div>
+<div><div class="team-photo"></div><h3>Priya Nair</h3><div class="role">Esthetician</div></div>
+</div>
+</div></section>
+<section class="cta-band" id="book">
+<h2>Ready to Glow?</h2>
+<p>Book online in under a minute, or give us a call.</p>
+<a href="tel:5554567890" class="btn btn-out">☎ (555) 456-7890</a>
+</section>
+<footer><div class="wrap">
+<div>1188 Bloom Avenue, Suite 4 · Uptown, ST 00000</div>
+<div class="flinks"><a href="#">Instagram</a><a href="#">Book Online</a><a href="#">Gift Cards</a></div>
+<div>© 2026 Lumière Salon & Spa</div>
+</div></footer>
+</body></html>`},
+{id:'fitness',name:'Fitness / Gym',emoji:'💪',desc:'Dark, energetic, class schedule, membership tiers, trainers.',html:`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forge Athletics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--black:#0a0a0c;--charcoal:#161619;--lime:#d4f251;--gray:#9a9aa2;--card:#1c1c20}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;color:#fff;background:var(--black);line-height:1.6}
+h1,h2,h3{font-family:'Anton',sans-serif;font-weight:400;text-transform:uppercase;letter-spacing:.5px}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+.btn{display:inline-block;padding:16px 34px;font-size:.85rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;cursor:pointer;border-radius:2px}
+.btn-fill{background:var(--lime);color:var(--black)}
+.btn-out{border:2px solid #fff;color:#fff}
+nav{display:flex;align-items:center;justify-content:space-between;padding:26px 28px}
+.logo{font-family:'Anton',sans-serif;font-size:1.5rem;letter-spacing:1px}
+.logo span{color:var(--lime)}
+.navlinks{display:flex;gap:32px;font-size:.86rem;font-weight:600;text-transform:uppercase}
+.hero{position:relative;padding:60px 0 100px;background:linear-gradient(160deg,#151517,var(--black))}
+.hero-grid{display:grid;grid-template-columns:1fr .8fr;gap:40px;align-items:center}
+.hero h1{font-size:clamp(3rem,7vw,5.5rem);line-height:.95;margin-bottom:24px}
+.hero h1 .accent{color:var(--lime)}
+.hero p{color:var(--gray);font-size:1.05rem;max-width:440px;margin-bottom:34px}
+.hero-btns{display:flex;gap:14px;flex-wrap:wrap}
+.hero-visual{aspect-ratio:3/4;background:repeating-linear-gradient(100deg,#1c1c20 0 24px,#141416 24px 48px);border-radius:6px;border:1px solid #2a2a2e}
+.stat-row{display:flex;gap:0;margin-top:60px;border-top:1px solid #232327;padding-top:34px}
+.stat{flex:1;border-right:1px solid #232327;padding-right:20px}
+.stat:last-child{border-right:none}
+.stat-n{font-family:'Anton',sans-serif;font-size:2.4rem;color:var(--lime)}
+.stat-l{color:var(--gray);font-size:.76rem;text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+.section{padding:90px 0}
+.section-head{margin-bottom:50px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px}
+.section-tag{color:var(--lime);font-weight:800;font-size:.8rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px}
+.section-head h2{font-size:clamp(2rem,4vw,2.8rem)}
+.schedule{background:var(--charcoal);border-radius:10px;overflow:hidden}
+.sched-row{display:grid;grid-template-columns:110px 1fr 1fr 1fr;padding:18px 24px;border-bottom:1px solid #232327;align-items:center;font-size:.9rem}
+.sched-row:first-child{background:#202024;font-weight:800;text-transform:uppercase;font-size:.74rem;letter-spacing:1px;color:var(--gray)}
+.sched-row:last-child{border-bottom:none}
+.class-tag{display:inline-block;background:rgba(212,242,81,.12);color:var(--lime);padding:4px 10px;border-radius:4px;font-size:.78rem;font-weight:700}
+.pricing{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.price-card{background:var(--card);border-radius:10px;padding:36px 28px;border:1px solid #232327}
+.price-card.pop{background:var(--lime);color:var(--black)}
+.price-card .tier{font-weight:800;text-transform:uppercase;font-size:.86rem;letter-spacing:1px;margin-bottom:14px}
+.price-card .amt{font-family:'Anton',sans-serif;font-size:2.6rem;margin-bottom:4px}
+.price-card .per{color:var(--gray);font-size:.82rem;margin-bottom:24px}
+.price-card.pop .per{color:#1a1e08}
+.price-card ul{list-style:none;margin-bottom:28px}
+.price-card li{padding:8px 0;border-top:1px solid rgba(255,255,255,.08);font-size:.88rem;color:var(--gray)}
+.price-card.pop li{border-top:1px solid rgba(0,0,0,.1);color:#2a2e18}
+.trainers{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.trainer-card{position:relative}
+.trainer-photo{aspect-ratio:3/4;background:repeating-linear-gradient(120deg,#1c1c20 0 20px,#141416 20px 40px);border-radius:8px;margin-bottom:14px}
+.trainer-card h3{font-family:'Inter',sans-serif;font-weight:700;font-size:1rem;text-transform:none}
+.trainer-card .role{color:var(--lime);font-size:.78rem;text-transform:uppercase;letter-spacing:1px}
+.cta-band{background:var(--lime);color:var(--black);text-align:center;padding:80px 0}
+.cta-band h2{margin-bottom:16px}
+.cta-band p{margin-bottom:30px;font-weight:500}
+footer{padding:50px 0 26px;border-top:1px solid #1c1c20;color:var(--gray);font-size:.86rem}
+.foot-grid{display:flex;justify-content:space-between;flex-wrap:wrap;gap:20px}
+.foot-links{display:flex;gap:24px}
+@media(max-width:820px){.hero-grid{grid-template-columns:1fr}.stat-row{flex-wrap:wrap}.stat{flex:1 1 45%;border-right:none;margin-bottom:16px}.pricing,.trainers{grid-template-columns:1fr 1fr}.sched-row{grid-template-columns:70px 1fr 1fr;font-size:.8rem}.sched-row div:nth-child(4){display:none}.navlinks{display:none}}
+@media(max-width:560px){.pricing,.trainers{grid-template-columns:1fr}}
+</style></head>
+<body>
+<nav><div class="logo">FORGE<span>.</span></div><div class="navlinks"><a href="#schedule">Classes</a><a href="#pricing">Membership</a><a href="#trainers">Trainers</a></div><a href="#pricing" class="btn btn-fill" style="padding:11px 22px">Join Now</a></nav>
+<header class="hero"><div class="wrap"><div class="hero-grid">
+<div><h1>Train Harder.<br>Become <span class="accent">Forged.</span></h1>
+<p>24/7 strength and conditioning gym with expert coaching, small-group classes, and a community that pushes you further than you'd go alone.</p>
+<div class="hero-btns"><a href="#pricing" class="btn btn-fill">Start Free Trial</a><a href="#schedule" class="btn btn-out">View Classes</a></div>
+<div class="stat-row">
+<div class="stat"><div class="stat-n">800+</div><div class="stat-l">Active Members</div></div>
+<div class="stat"><div class="stat-n">24/7</div><div class="stat-l">Access</div></div>
+<div class="stat"><div class="stat-n">12</div><div class="stat-l">Weekly Classes</div></div>
+</div>
+</div>
+<div class="hero-visual"></div>
+</div></div></header>
+<section class="section" id="schedule"><div class="wrap">
+<div class="section-head"><div><div class="section-tag">This Week</div><h2>Class Schedule</h2></div><a href="#pricing" class="btn btn-out">Book a Class</a></div>
+<div class="schedule">
+<div class="sched-row"><div>Time</div><div>Monday</div><div>Wednesday</div><div>Friday</div></div>
+<div class="sched-row"><div>6:00 AM</div><div><span class="class-tag">Strength</span></div><div><span class="class-tag">HIIT</span></div><div><span class="class-tag">Strength</span></div></div>
+<div class="sched-row"><div>9:00 AM</div><div><span class="class-tag">Mobility</span></div><div><span class="class-tag">Strength</span></div><div><span class="class-tag">Mobility</span></div></div>
+<div class="sched-row"><div>5:30 PM</div><div><span class="class-tag">HIIT</span></div><div><span class="class-tag">Conditioning</span></div><div><span class="class-tag">HIIT</span></div></div>
+<div class="sched-row"><div>7:00 PM</div><div><span class="class-tag">Open Gym</span></div><div><span class="class-tag">Open Gym</span></div><div><span class="class-tag">Open Gym</span></div></div>
+</div>
+</div></section>
+<section class="section" id="pricing"><div class="wrap">
+<div class="section-head"><div><div class="section-tag">Membership</div><h2>Pick Your Plan</h2></div></div>
+<div class="pricing">
+<div class="price-card"><div class="tier">Basic</div><div class="amt">$39</div><div class="per">per month</div><ul><li>Gym floor access</li><li>Standard hours</li><li>Locker room</li></ul><a href="#" class="btn btn-out" style="width:100%;text-align:center">Choose Basic</a></div>
+<div class="price-card pop"><div class="tier">Unlimited</div><div class="amt">$79</div><div class="per">per month</div><ul><li>24/7 access</li><li>All group classes</li><li>1 guest pass/month</li><li>Nutrition guide</li></ul><a href="#" class="btn" style="width:100%;text-align:center;background:var(--black);color:#fff">Choose Unlimited</a></div>
+<div class="price-card"><div class="tier">Elite</div><div class="amt">$129</div><div class="per">per month</div><ul><li>Everything in Unlimited</li><li>4 PT sessions/month</li><li>Recovery suite access</li></ul><a href="#" class="btn btn-out" style="width:100%;text-align:center">Choose Elite</a></div>
+</div>
+</div></section>
+<section class="section" id="trainers"><div class="wrap">
+<div class="section-head"><div><div class="section-tag">Coaching Staff</div><h2>Meet the Trainers</h2></div></div>
+<div class="trainers">
+<div class="trainer-card"><div class="trainer-photo"></div><h3>Marcus Cole</h3><div class="role">Head Coach</div></div>
+<div class="trainer-card"><div class="trainer-photo"></div><h3>Elena Vasquez</h3><div class="role">Strength</div></div>
+<div class="trainer-card"><div class="trainer-photo"></div><h3>Theo James</h3><div class="role">Conditioning</div></div>
+<div class="trainer-card"><div class="trainer-photo"></div><h3>Nia Brooks</h3><div class="role">Mobility</div></div>
+</div>
+</div></section>
+<section class="cta-band"><div class="wrap">
+<h2>Your First Class Is Free</h2>
+<p>No contracts. No pressure. Just show up.</p>
+<a href="#" class="btn" style="background:var(--black);color:#fff">Claim Your Free Class</a>
+</div></section>
+<footer><div class="wrap foot-grid">
+<div>Forge Athletics · 220 Iron Row, Metro City</div>
+<div class="foot-links"><a href="#">Instagram</a><a href="#">Schedule</a><a href="#">Contact</a></div>
+</div></footer>
+</body></html>`},
+{id:'professional',name:'Professional Services',emoji:'⚖️',desc:'Corporate, minimal, credentials-forward. Law, accounting, consulting.',html:`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whitfield & Cross Legal Counsel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0f1b2e;--gold:#a8863f;--ivory:#faf8f4;--ink:#1e2a3a;--gray:#6b7684}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;color:var(--ink);background:#fff;line-height:1.75;font-weight:300}
+h1,h2,h3{font-family:'Libre Baskerville',serif;font-weight:700}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1140px;margin:0 auto;padding:0 32px}
+.btn{display:inline-block;padding:16px 32px;font-size:.8rem;letter-spacing:2px;text-transform:uppercase;cursor:pointer;border-radius:0}
+.btn-fill{background:var(--gold);color:#fff}
+.btn-out{border:1px solid var(--navy);color:var(--navy)}
+.topbar{background:var(--navy);color:#c8ceda;padding:10px 0;font-size:.8rem;letter-spacing:.5px}
+.topbar .wrap{display:flex;justify-content:flex-end;gap:30px}
+nav{display:flex;align-items:center;justify-content:space-between;padding:26px 32px;border-bottom:1px solid #ece7dd}
+.logo{font-family:'Libre Baskerville',serif;font-size:1.35rem;color:var(--navy)}
+.logo em{color:var(--gold);font-style:normal}
+.navlinks{display:flex;gap:34px;font-size:.84rem;letter-spacing:.5px;text-transform:uppercase;color:var(--gray)}
+.hero{padding:100px 0;background:var(--ivory)}
+.hero-in{max-width:760px}
+.hero-tag{color:var(--gold);font-size:.8rem;letter-spacing:3px;text-transform:uppercase;margin-bottom:20px}
+.hero h1{font-size:clamp(2.2rem,4.4vw,3.4rem);line-height:1.25;margin-bottom:24px;color:var(--navy)}
+.hero p{color:var(--gray);font-size:1.05rem;margin-bottom:36px;max-width:600px}
+.hero-btns{display:flex;gap:16px;flex-wrap:wrap}
+.credentials-strip{border-top:1px solid #ece7dd;border-bottom:1px solid #ece7dd;padding:26px 0}
+.cred-grid{display:flex;justify-content:space-between;flex-wrap:wrap;gap:20px;text-align:center}
+.cred-grid div{font-size:.82rem;letter-spacing:1px;text-transform:uppercase;color:var(--gray);font-weight:500}
+.section{padding:100px 0}
+.section-head{max-width:640px;margin-bottom:56px}
+.section-tag{color:var(--gold);font-size:.8rem;letter-spacing:3px;text-transform:uppercase;margin-bottom:14px}
+.section-head h2{font-size:clamp(1.9rem,3.6vw,2.5rem);color:var(--navy)}
+.practice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:#ece7dd}
+.practice-card{background:#fff;padding:40px 34px}
+.practice-card .num{font-family:'Libre Baskerville',serif;color:var(--gold);font-size:1.5rem;margin-bottom:16px}
+.practice-card h3{font-size:1.2rem;color:var(--navy);margin-bottom:12px}
+.practice-card p{color:var(--gray);font-size:.9rem}
+.stats-band{background:var(--navy);color:#fff;padding:70px 0}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:30px;text-align:center}
+.stats-grid .n{font-family:'Libre Baskerville',serif;font-size:2.4rem;color:var(--gold)}
+.stats-grid .l{font-size:.78rem;letter-spacing:1.5px;text-transform:uppercase;color:#c8ceda;margin-top:6px}
+.team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:44px}
+.team-photo{aspect-ratio:3/4;background:repeating-linear-gradient(100deg,#f0ece3 0 22px,#e6e0d3 22px 44px);margin-bottom:18px}
+.team-grid h3{font-size:1.1rem;color:var(--navy)}
+.team-grid .role{color:var(--gold);font-size:.78rem;letter-spacing:1.5px;text-transform:uppercase;margin:4px 0 12px}
+.team-grid p{color:var(--gray);font-size:.86rem}
+.cta-band{background:var(--ivory);text-align:center;padding:90px 0;border-top:1px solid #ece7dd}
+.cta-band h2{color:var(--navy);margin-bottom:16px}
+.cta-band p{color:var(--gray);margin-bottom:32px}
+footer{background:var(--navy);color:#8f9aab;padding:56px 0 26px;font-size:.86rem}
+.foot-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:40px;margin-bottom:40px}
+.foot-grid h4{color:#fff;font-size:.78rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px;font-weight:600}
+.foot-grid a,.foot-grid p{display:block;margin-bottom:9px}
+.foot-bottom{border-top:1px solid #1e2c42;padding-top:22px;text-align:center;font-size:.78rem}
+@media(max-width:820px){.practice-grid,.team-grid{grid-template-columns:1fr}.stats-grid{grid-template-columns:1fr 1fr}.navlinks{display:none}.foot-grid{grid-template-columns:1fr}}
+</style></head>
+<body>
+<div class="topbar"><div class="wrap"><span>☎ (555) 234-5678</span><span>Mon–Fri, 8am–6pm</span></div></div>
+<nav><div class="logo">Whitfield <em>&</em> Cross</div><div class="navlinks"><a href="#practice">Practice Areas</a><a href="#team">Attorneys</a><a href="#contact">Consultation</a></div><a href="#contact" class="btn btn-out" style="padding:11px 22px">Schedule a Call</a></nav>
+<header class="hero"><div class="wrap hero-in">
+<div class="hero-tag">Trusted Legal Counsel Since 1994</div>
+<h1>Sound Advice. Serious Advocacy. Real Results.</h1>
+<p>Whitfield & Cross provides clear, strategic legal counsel to individuals and businesses across the region — because good advice shouldn't come wrapped in jargon.</p>
+<div class="hero-btns"><a href="#contact" class="btn btn-fill">Schedule a Free Consultation</a><a href="#practice" class="btn btn-out">Our Practice Areas</a></div>
+</div></header>
+<div class="credentials-strip"><div class="wrap cred-grid">
+<div>AV Preeminent Rated</div><div>Super Lawyers 2020–2026</div><div>30+ Years Combined Experience</div><div>500+ Cases Resolved</div>
+</div></div>
+<section class="section" id="practice"><div class="wrap">
+<div class="section-head"><div class="section-tag">How We Help</div><h2>Practice Areas</h2></div>
+<div class="practice-grid">
+<div class="practice-card"><div class="num">01</div><h3>Business Law</h3><p>Formation, contracts, disputes, and general counsel for growing companies.</p></div>
+<div class="practice-card"><div class="num">02</div><h3>Estate Planning</h3><p>Wills, trusts, and probate — protecting what matters for the next generation.</p></div>
+<div class="practice-card"><div class="num">03</div><h3>Real Estate</h3><p>Residential and commercial transactions, closings, and title disputes.</p></div>
+</div>
+</div></section>
+<section class="stats-band"><div class="wrap stats-grid">
+<div><div class="n">500+</div><div class="l">Cases Won</div></div>
+<div><div class="n">30+</div><div class="l">Years Experience</div></div>
+<div><div class="n">98%</div><div class="l">Client Satisfaction</div></div>
+<div><div class="n">24hr</div><div class="l">Response Time</div></div>
+</div></section>
+<section class="section" id="team"><div class="wrap">
+<div class="section-head"><div class="section-tag">Our Attorneys</div><h2>Experience You Can Trust</h2></div>
+<div class="team-grid">
+<div><div class="team-photo"></div><h3>Margaret Whitfield, Esq.</h3><div class="role">Founding Partner</div><p>J.D., Georgetown Law · 25 years in business and estate law.</p></div>
+<div><div class="team-photo"></div><h3>David Cross, Esq.</h3><div class="role">Founding Partner</div><p>J.D., UVA Law · Real estate and commercial litigation.</p></div>
+<div><div class="team-photo"></div><h3>Priya Anand, Esq.</h3><div class="role">Senior Associate</div><p>J.D., Fordham Law · Business formation and contracts.</p></div>
+</div>
+</div></section>
+<section class="cta-band" id="contact"><div class="wrap">
+<h2>Schedule Your Free Consultation</h2>
+<p>Most consultations are scheduled within 48 hours. No obligation.</p>
+<a href="tel:5552345678" class="btn btn-fill">☎ Call (555) 234-5678</a>
+</div></section>
+<footer><div class="wrap">
+<div class="foot-grid">
+<div><h4>Whitfield & Cross</h4><p>800 Courthouse Square, Suite 500<br>Metro City, ST 00000</p></div>
+<div><h4>Practice Areas</h4><a href="#">Business Law</a><a href="#">Estate Planning</a><a href="#">Real Estate</a></div>
+<div><h4>Firm</h4><a href="#team">Attorneys</a><a href="#contact">Consultation</a><a href="#">Careers</a></div>
+</div>
+<div class="foot-bottom">© 2026 Whitfield & Cross Legal Counsel. Attorney Advertising.</div>
+</div></footer>
+</body></html>`},
+];
+
 // ── SITE BUILDER ───────────────────────────────────────────────────────────
 function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
   const PAGES_LIST=[
@@ -3628,10 +4173,29 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
         ))}
       </div>
 
-      {/* TEMPLATE STARTERS — only on home page when not built */}
+      {/* REAL DESIGN TEMPLATES — instant load, no AI call, genuinely distinct layouts */}
+      {!currentHtml&&!loading&&activePage==='home'&&(
+        <div style={{marginBottom:16}}>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.6rem',letterSpacing:'2px',textTransform:'uppercase',color:'#c9a84c',marginBottom:8}}>// Design Templates — load instantly, then customize by chat</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:8}}>
+            {SITE_TEMPLATES.map(t=>(
+              <button key={t.id} onClick={()=>{setPages(p=>({...p,home:t.html}));setMsgs(m=>({...m,home:[...(m.home||[]),{role:'ai',text:`✦ Loaded the ${t.name} template. Tell me the business name, city, and any details to customize it — or start editing directly.`}]}));if(onSiteBuilt)onSiteBuilt();toast(`${t.name} template loaded.`,'success');}}
+                style={{background:'#0a0a14',border:'1px solid rgba(201,168,76,.15)',padding:'12px',cursor:'pointer',textAlign:'left',transition:'border-color .2s',display:'flex',flexDirection:'column',gap:5}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor='rgba(201,168,76,.4)'}
+                onMouseLeave={e=>e.currentTarget.style.borderColor='rgba(201,168,76,.15)'}>
+                <span style={{fontSize:'1.1rem'}}>{t.emoji}</span>
+                <span style={{fontFamily:"'Cinzel',serif",fontSize:'.72rem',fontWeight:700,color:'#ddd8ce'}}>{t.name}</span>
+                <span style={{fontSize:'.62rem',fontWeight:300,color:'#5a5868',lineHeight:1.4}}>{t.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* AI QUICK-START PROMPTS — generates from scratch via chat */}
       {!currentHtml&&!loading&&activePage==='home'&&(
         <div style={{marginBottom:12}}>
-          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.6rem',letterSpacing:'2px',textTransform:'uppercase',color:'#2e2d3c',marginBottom:8}}>// Start with a template or describe any business</div>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.6rem',letterSpacing:'2px',textTransform:'uppercase',color:'#2e2d3c',marginBottom:8}}>// Or describe any business and the AI will build one from scratch</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:6}}>
             {[
               {name:'HVAC',emoji:'❄️',p:'Build a professional website for Apex HVAC LLC in Austin TX. 4.9 stars, 203 reviews. Hero with emergency CTA, services grid, reviews strip, contact form.'},
