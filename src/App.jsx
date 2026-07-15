@@ -167,11 +167,13 @@ const callClaude = async (prompt, max=1400) => {
     if (p.includes('social') || p.includes('email campaign') || p.includes('ad copy')) return MOCK_RESPONSES.studio;
     return MOCK_RESPONSES.default;
   }
-  const r = await fetch('https://api.anthropic.com/v1/messages',{
+  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
+  const r = await fetch(`${workerUrl}/`,{
     method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:max,messages:[{role:'user',content:prompt}]})
+    body:JSON.stringify({max_tokens:max,messages:[{role:'user',content:prompt}]})
   });
   const data = await r.json();
+  if (data.error) throw new Error(typeof data.error === 'string' ? data.error : (data.error.message || 'AI request failed.'));
   return data.content?.map(b=>b.text||'').join('').trim();
 };
 
