@@ -16,6 +16,26 @@ const STRIPE_PRICE_IDS = {
   warden:    'price_1Ts6FpPOXcVqpgITGSNjSg2t', // $349/mo
 };
 
+const TIER_INFO = {
+  seeker:    { name:'Seeker',    price:'$10/mo'  },
+  scribe:    { name:'Scribe',    price:'$49/mo'  },
+  archon:    { name:'Archon',    price:'$99/mo'  },
+  sovereign: { name:'Sovereign', price:'$199/mo' },
+  warden:    { name:'Warden',    price:'$349/mo' },
+};
+
+function startTierCheckout(tier,user,setScreen,toast) {
+  if (!user?.id) { setScreen('auth'); return; }
+  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
+  fetch(`${workerUrl}/create-trial-checkout`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({tier,email:user.email,name:user.name,userId:user.id,origin:window.location.origin}),
+  }).then(r=>r.json())
+    .then(({url,error})=>{ if(url) window.location.href=url; else toast(error||'Upgrade failed. Try again.','error'); })
+    .catch(()=>toast('Upgrade failed. Try again.','error'));
+}
+
 const uid = () => Math.random().toString(36).slice(2,10);
 const now = () => new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
 const scoreClass = s => s>=80?'b-green':s>=60?'b-gold':'b-red';
@@ -4145,15 +4165,29 @@ function SettingsPage({user,onUpdateUser,toast,setProspects,setPitches,setPropos
           <div className="settings-card-title">Current Plan</div>
           <div className="settings-card-sub">Your subscription tier</div>
           <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 0',flexWrap:'wrap'}}>
-            <div style={{fontFamily:"'Cinzel',serif",fontSize:'1.4rem',fontWeight:700,color:'#c9a84c'}}>{user?.plan==='archon_trial'?'Archon':user?.plan==='archon'?'Archon':user?.plan||'Apprentice'}</div>
+            <div style={{fontFamily:"'Cinzel',serif",fontSize:'1.4rem',fontWeight:700,color:'#c9a84c'}}>{user?.plan==='archon_trial'?'Archon':TIER_INFO[user?.plan]?.name||'Apprentice'}</div>
             <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.58rem',letterSpacing:'2px',textTransform:'uppercase',color:user?.plan&&user.plan!=='apprentice'?'#7ac89a':'#3a3848',padding:'3px 10px',border:`1px solid ${user?.plan&&user.plan!=='apprentice'?'rgba(122,200,154,.3)':'rgba(201,168,76,.1)'}`,background:user?.plan&&user.plan!=='apprentice'?'rgba(122,200,154,.06)':'transparent'}}>
-              {user?.plan==='archon_trial'?`TRIAL · ${user?.daysLeft||'—'} days left`:user?.plan==='archon'?'ACTIVE':'FREE'}
+              {user?.plan==='archon_trial'?`TRIAL · ${user?.daysLeft||'—'} days left`:(user?.plan&&user.plan!=='apprentice')?'ACTIVE':'FREE'}
             </div>
           </div>
           {(!user?.plan||user?.plan==='apprentice')&&(
-            <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              <p style={{fontSize:'.76rem',fontWeight:300,color:'#5a5868',lineHeight:1.6}}>You're on the free plan. Upgrade to unlock unlimited AI credits, unlimited prospects, and full site deployment.</p>
-              <button className="btn btn-gold btn-sm" onClick={()=>{const workerUrl=window.CLAUDE_ENDPOINT||'https://runescript.its-the-prithivi-show.workers.dev';if(user?.id){fetch(`${workerUrl}/create-trial-checkout`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:user.email,name:user.name,userId:user.id,origin:window.location.origin})}).then(r=>r.json()).then(({url})=>{if(url)window.location.href=url;}).catch(()=>toast('Upgrade failed. Try again.','error'));}else{setScreen('auth');}}}>Start Free Trial / Upgrade →</button>
+            <div style={{display:'flex',flexDirection:'column',gap:10}}>
+              <p style={{fontSize:'.76rem',fontWeight:300,color:'#5a5868',lineHeight:1.6}}>You're on the free plan. Pick a tier to unlock unlimited AI credits, unlimited prospects, and full site deployment.</p>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))',gap:8}}>
+                {Object.entries(TIER_INFO).map(([key,t])=>(
+                  <div key={key} style={{border:'1px solid rgba(201,168,76,.15)',padding:'12px',display:'flex',flexDirection:'column',gap:8}}>
+                    <div style={{fontFamily:"'Cinzel',serif",fontSize:'.88rem',fontWeight:700,color:'#c9a84c'}}>{t.name}</div>
+                    <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.6rem',color:'#7a7888'}}>{t.price}{key==='archon'?' · 30-day trial':''}</div>
+                    <button className={key==='archon'?'btn btn-gold btn-sm':'btn btn-ghost btn-sm'} onClick={()=>startTierCheckout(key,user,setScreen,toast)}>Get Started →</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {user?.plan&&user.plan!=='apprentice'&&user.plan!=='archon_trial'&&user.plan!=='archon'&&(
+            <div>
+              <p style={{fontSize:'.76rem',fontWeight:300,color:'#7ac89a',lineHeight:1.6,marginBottom:8}}>Full {TIER_INFO[user.plan]?.name||user.plan} access · {TIER_INFO[user.plan]?.price||''} · Renews automatically</p>
+              <button className="btn btn-ghost btn-sm" onClick={()=>window.open('https://billing.stripe.com/p/login/6oU3cxfkd4xPadZ8GZ5Ne00','_blank')}>Manage Subscription →</button>
             </div>
           )}
           {user?.plan==='archon_trial'&&(
@@ -7459,28 +7493,33 @@ export default function RuneScript(){
     // Handle Stripe return
     const trialStatus = params.get('trial');
     const sessionId = params.get('session_id');
+    const purchasedTier = params.get('tier') || 'archon';
     if (trialStatus === 'success' && sessionId) {
       setStripeReturn('success');
-      // Verify session and activate trial
+      // Verify session and activate the purchased plan
       const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
       fetch(`${workerUrl}/check-session/${sessionId}`)
         .then(r => r.json())
         .then(async session => {
           if (session.status === 'complete' || session.status === 'open') {
-            // Get current auth user and update their profile to trial
+            // Get current auth user and update their profile to the purchased plan
             const { data: { user: authUser } } = await sb.auth.getUser();
             if (authUser) {
-              const trialEnd = new Date();
-              trialEnd.setDate(trialEnd.getDate() + 30);
-              await sb.from('profiles').upsert({
+              const isTrialTier = purchasedTier === 'archon';
+              const profileUpdate = {
                 id: authUser.id,
-                plan: 'archon_trial',
-                trial_ends_at: trialEnd.toISOString(),
+                plan: isTrialTier ? 'archon_trial' : purchasedTier,
                 stripe_customer_id: session.customerId,
                 stripe_subscription_id: session.subscriptionId,
-              });
-              window.__trialLimit = 100;
-              window.__trialUsed = 0;
+              };
+              if (isTrialTier) {
+                const trialEnd = new Date();
+                trialEnd.setDate(trialEnd.getDate() + 30);
+                profileUpdate.trial_ends_at = trialEnd.toISOString();
+              }
+              await sb.from('profiles').upsert(profileUpdate);
+              if (isTrialTier) { window.__trialLimit = 100; window.__trialUsed = 0; }
+              else { window.__trialLimit = null; }
               // Clean URL
               window.history.replaceState({}, '', '/');
             }

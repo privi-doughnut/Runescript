@@ -12,6 +12,16 @@ function corsHeaders(origin) {
   };
 }
 
+// Maps each tier to the Cloudflare secret name holding its Stripe price ID.
+// All 5 are provisioned as secrets in the dashboard — none hardcoded here.
+const TIER_PRICE_ENV_KEYS = {
+  seeker: 'STRIPE_SEEKER_PRICE_ID',
+  scribe: 'STRIPE_SCRIBE_PRICE_ID',
+  archon: 'STRIPE_ARCHON_PRICE_ID',
+  sovereign: 'STRIPE_SOVEREIGN_PRICE_ID',
+  warden: 'STRIPE_WARDEN_PRICE_ID',
+};
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
@@ -22,33 +32,42 @@ export default {
       return new Response(null, { status: 204, headers: cors });
     }
 
-    // ── STRIPE: Create Trial Checkout Session ──────────────────────────────
+    // ── STRIPE: Create Checkout Session (all 5 tiers) ───────────────────────
+    // Archon keeps its 30-day trial; the other four are plain subscriptions.
     if (url.pathname === '/create-trial-checkout' && request.method === 'POST') {
-      if (!env.STRIPE_SECRET_KEY || !env.STRIPE_ARCHON_PRICE_ID) {
+      const stripeKey = env.RUNESCRIPT_STRIPE_API_KEY;
+      if (!stripeKey || !env.STRIPE_ARCHON_PRICE_ID) {
         return Response.json({ error: 'Stripe not configured' }, { status: 500, headers: cors });
       }
       try {
-        const { email, name, userId, origin: clientOrigin } = await request.json();
+        const { email, name, userId, origin: clientOrigin, tier } = await request.json();
         const returnOrigin = clientOrigin || 'https://runescript.netlify.app';
+        const selectedTier = TIER_PRICE_ENV_KEYS.hasOwnProperty(tier) ? tier : 'archon';
+        const priceId = env[TIER_PRICE_ENV_KEYS[selectedTier]];
+        const isTrial = selectedTier === 'archon';
+        if (!priceId) {
+          return Response.json({ error: 'Price not configured for this tier' }, { status: 500, headers: cors });
+        }
 
         const params = new URLSearchParams({
           'payment_method_types[]': 'card',
           'mode': 'subscription',
           'customer_email': email,
-          'line_items[0][price]': env.STRIPE_ARCHON_PRICE_ID,
+          'line_items[0][price]': priceId,
           'line_items[0][quantity]': '1',
-          'subscription_data[trial_period_days]': '30',
           'subscription_data[metadata][userId]': userId || '',
           'subscription_data[metadata][name]': name || '',
-          'success_url': `${returnOrigin}/?trial=success&session_id={CHECKOUT_SESSION_ID}`,
+          'subscription_data[metadata][tier]': selectedTier,
+          'success_url': `${returnOrigin}/?trial=success&tier=${selectedTier}&session_id={CHECKOUT_SESSION_ID}`,
           'cancel_url': `${returnOrigin}/?trial=cancelled`,
           'allow_promotion_codes': 'true',
         });
+        if (isTrial) params.set('subscription_data[trial_period_days]', '30');
 
         const resp = await fetch('https://api.stripe.com/v1/checkout/sessions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${env.STRIPE_SECRET_KEY}`,
+            'Authorization': `Bearer ${stripeKey}`,
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: params.toString(),
@@ -63,13 +82,14 @@ export default {
 
     // ── STRIPE: Verify Session After Checkout ──────────────────────────────
     if (url.pathname.startsWith('/check-session/') && request.method === 'GET') {
-      if (!env.STRIPE_SECRET_KEY) {
+      const stripeKey = env.RUNESCRIPT_STRIPE_API_KEY;
+      if (!stripeKey) {
         return Response.json({ error: 'Stripe not configured' }, { status: 500, headers: cors });
       }
       try {
         const sessionId = url.pathname.replace('/check-session/', '');
         const resp = await fetch(`https://api.stripe.com/v1/checkout/sessions/${sessionId}`, {
-          headers: { 'Authorization': `Bearer ${env.STRIPE_SECRET_KEY}` },
+          headers: { 'Authorization': `Bearer ${stripeKey}` },
         });
         const session = await resp.json();
         return Response.json({
@@ -86,7 +106,8 @@ export default {
 
     // ── RESEND: Send Email ─────────────────────────────────────────────────
     if (url.pathname === '/send-email' && request.method === 'POST') {
-      if (!env.RESEND_API_KEY) {
+      const resendKey = env['RUNESCRIPT(RESEND)_API_KEY'];
+      if (!resendKey) {
         return Response.json({ error: 'Resend not configured' }, { status: 500, headers: cors });
       }
       try {
@@ -97,7 +118,7 @@ export default {
         const resp = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+            'Authorization': `Bearer ${resendKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -120,14 +141,15 @@ export default {
     // client secret server-side. Frontend sends { code, redirectUri } on first
     // connect, or { refreshToken } to refresh.
     if (url.pathname === '/google-auth' && request.method === 'POST') {
-      if (!env.GOOGLE_CLIENT_SECRET) {
+      const googleSecret = env.RUNESCRIPT_GOOGLE_CLIENT_SECRET;
+      if (!googleSecret) {
         return Response.json({ error: 'Google not configured' }, { status: 500, headers: cors });
       }
       try {
         const { code, redirectUri, refreshToken, clientId } = await request.json();
         const body = new URLSearchParams();
         body.set('client_id', clientId || env.GOOGLE_CLIENT_ID || '');
-        body.set('client_secret', env.GOOGLE_CLIENT_SECRET);
+        body.set('client_secret', googleSecret);
         if (refreshToken) {
           body.set('refresh_token', refreshToken);
           body.set('grant_type', 'refresh_token');
@@ -195,7 +217,8 @@ export default {
     }
 
     // ── CLAUDE API PROXY ───────────────────────────────────────────────────
-    if (!env.ANTHROPIC_API_KEY) {
+    const anthropicKey = env.RUNESCRIPT_API_KEY;
+    if (!anthropicKey) {
       return Response.json({ error: 'API key not configured' }, { status: 500, headers: cors });
     }
     try {
@@ -204,7 +227,7 @@ export default {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': env.ANTHROPIC_API_KEY,
+          'x-api-key': anthropicKey,
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
