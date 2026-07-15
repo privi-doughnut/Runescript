@@ -3894,6 +3894,58 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
     }
   },[activePage,currentHtml]);
 
+  // Inline edit mode: makes individual text elements independently editable
+  // rather than the whole <body> as one contentEditable region. A single
+  // shared region lets a triple-click-and-retype at an element boundary
+  // merge adjacent elements' text together (confirmed by testing this
+  // directly — a whole-body version silently absorbed a paragraph into the
+  // heading above it). Scoping contentEditable to each leaf text element
+  // keeps every edit contained to its own element.
+  const EDITABLE_SELECTOR='h1,h2,h3,h4,h5,h6,p,a,li,span,button,td,th,label';
+  const applyEditMode=(on)=>{
+    const doc=iframeRef.current?.contentDocument;
+    if(!doc||!doc.body)return;
+    doc.body.style.cursor=on?'text':'';
+    const editableEls=doc.body.querySelectorAll(EDITABLE_SELECTOR);
+    editableEls.forEach(el=>{
+      // Skip elements whose only children are other editable elements —
+      // editing the container as well as its children double-nests edits.
+      const hasElementChildren=Array.from(el.children).some(c=>c.matches(EDITABLE_SELECTOR));
+      if(hasElementChildren){el.contentEditable='false';return;}
+      el.contentEditable=on?'true':'false';
+      el.style.outline=on?'1px dashed rgba(122,200,154,.5)':'';
+      el.style.outlineOffset=on?'2px':'';
+    });
+    doc.body.onclick=on?(e)=>{
+      if(e.target.tagName==='IMG'){
+        e.preventDefault();
+        const url=window.prompt('New image URL:',e.target.getAttribute('src')||'');
+        if(url)e.target.setAttribute('src',url);
+      }
+    }:null;
+  };
+  const toggleEditMode=()=>{
+    const next=!editMode;
+    setEditMode(next);
+    applyEditMode(next);
+  };
+  const saveInlineEdits=()=>{
+    const doc=iframeRef.current?.contentDocument;
+    if(!doc)return;
+    applyEditMode(false); // strip contentEditable/outline before serializing — those are editor-only affordances
+    const newHtml='<!DOCTYPE html>\n'+doc.documentElement.outerHTML;
+    commitPageChange(newHtml);
+    setEditMode(false);
+    toast('Edits saved.','success');
+  };
+  const discardInlineEdits=()=>{
+    setEditMode(false);
+    if(iframeRef.current&&currentHtml){
+      const blob=new Blob([currentHtml],{type:'text/html'});
+      iframeRef.current.src=URL.createObjectURL(blob);
+    }
+  };
+
   const send=async()=>{
     if(!input.trim()||loading)return;
     const msg=input.trim();setInput('');
@@ -4109,6 +4161,9 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
           {currentHtml&&(history[activePage]||[]).length>0&&<button className="btn btn-ghost btn-sm" onClick={undo} title="Undo">↶ Undo</button>}
           {currentHtml&&(future[activePage]||[]).length>0&&<button className="btn btn-ghost btn-sm" onClick={redo} title="Redo">↷ Redo</button>}
           {currentHtml&&<button className="btn btn-gold btn-sm" onClick={openReorder}>🧩 Edit Sections</button>}
+          {currentHtml&&!editMode&&<button className="btn btn-gold btn-sm" onClick={toggleEditMode}>✏️ Edit Text & Images</button>}
+          {currentHtml&&editMode&&<button className="btn btn-gold btn-sm" onClick={saveInlineEdits}>✓ Save Edits</button>}
+          {currentHtml&&editMode&&<button className="btn btn-ghost btn-sm" onClick={discardInlineEdits}>Discard</button>}
           {currentHtml&&<button className="btn btn-ghost btn-sm" onClick={generateSchema}>{showSchema?'Hide Preview':'Google Preview'}</button>}
           {builtCount>0&&<button className="btn btn-gold btn-sm" onClick={deployToGitHub} disabled={deploying}>{deploying?<><Spinner/>Deploying…</>:'Deploy to GitHub →'}</button>}
         </div>
@@ -4318,11 +4373,11 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
           </div>
         </div>
         <div className="builder-prev">
-          <div className="builder-prev-bar">
-            <span className="builder-prev-bar-title">{currentHtml?`${activePage}.html`:'Live Preview'}</span>
+          <div className="builder-prev-bar" style={editMode?{background:'rgba(122,200,154,.1)'}:{}}>
+            <span className="builder-prev-bar-title">{editMode?'✏️ Editing — click any text or image in the preview':currentHtml?`${activePage}.html`:'Live Preview'}</span>
             {currentHtml&&<button className="btn btn-ghost btn-xs" onClick={()=>{const blob=new Blob([currentHtml],{type:'text/html'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${activePage==='home'?'index':activePage}.html`;a.click();}}>↓</button>}
           </div>
-          {currentHtml?<iframe ref={iframeRef} title="preview" style={{flex:1,border:'none',width:'100%',height:'100%'}}/>
+          {currentHtml?<iframe ref={iframeRef} title="preview" onLoad={()=>{if(editMode)applyEditMode(true);}} style={{flex:1,border:'none',width:'100%',height:'100%'}}/>
           :<div className="builder-prev-empty"><div className="builder-prev-empty-r">ᚲ</div><div className="builder-prev-empty-t">Preview will appear here</div><div className="builder-prev-empty-s">Describe a business and hit Build.</div></div>}
         </div>
       </div>
