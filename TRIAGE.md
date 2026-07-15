@@ -74,6 +74,10 @@ I could not complete the loop without real GitHub credentials (not something to 
 - Dashboard shows two near-duplicate greetings stacked ("Good afternoon, Triage" and "Good afternoon, Triage." right below it) — looks like two separate components each rendering their own greeting. Cosmetic, low priority, will check during Phase 6 pass.
 - Saw one intermittent `401` on a Supabase `invoices` REST query on first dashboard load; did not reproduce on retry. Possibly a token-refresh race on the very first load right after signup. Not chasing further without a reliable repro — will watch for it during the full Phase 6 pass.
 
+## Deploy infrastructure note (found during verification, not a bug in the app itself)
+
+After the first batch of fixes (Agency OS/AI Studio crash, callClaude routing, onboarding render), Netlify stopped picking up new pushes to `main` — the live bundle hash stayed frozen at `index-Ml5ktS5b.js` across three subsequent pushes and ~20+ minutes, despite GitHub's `main` branch correctly showing each new commit (verified directly via the GitHub API). Suspected `package-lock.json` (newly added this session, and Netlify defaults to the stricter `npm ci` when a lockfile is present) — removed it, but the build still didn't trigger, ruling that out. Without Netlify dashboard/API access I can't see the actual build log or webhook status, so this needs the owner's Netlify dashboard (Site → Deploys) to see why. All commits are correctly on GitHub; Worker deploys are unaffected (separate mechanism, verified live via direct curl throughout).
+
 ## Fix order (per the brief: crashes first, since 1 & 2 share a cause)
 1. Bug 1 & 2 (shared) — `showLibrary`/`savedOutputs`/`brand` fix
 2. Bug 3 — `callClaude` Worker routing fix (highest impact — unblocks Bug 8 and 9's reachability too)
