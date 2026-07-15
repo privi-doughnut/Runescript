@@ -110,6 +110,33 @@ const sendEmail = async ({to, subject, html, from}) => {
   return data;
 };
 
+// Splits generated page HTML into its top-level <body> children so they can be
+// drag-reordered, then reassembles the HTML with the new order. Deliberately
+// structure-agnostic (works on any body children, not specific section tags)
+// since the HTML is AI-generated and its exact markup shape isn't guaranteed.
+const parseSectionsFromHtml = (html) => {
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const body = doc.body;
+    if (!body || body.children.length < 2) return null;
+    return Array.from(body.children).map((el, i) => {
+      const heading = el.querySelector('h1,h2,h3');
+      const text = (heading?.textContent || el.textContent || '').trim().slice(0, 50);
+      return { id: i, tag: el.tagName.toLowerCase(), label: text || `Section ${i + 1}` };
+    });
+  } catch (e) {
+    return null;
+  }
+};
+
+const rebuildHtmlWithOrder = (html, order) => {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const body = doc.body;
+  const children = Array.from(body.children);
+  order.forEach(i => { if (children[i]) body.appendChild(children[i]); });
+  return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+};
+
 const createPaymentLink = async ({amount, description, clientName}) => {
   const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
   const resp = await fetch(`${workerUrl}/create-invoice-payment`, {
@@ -3266,6 +3293,9 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
   const[showQR,setShowQR]=useState(false);
   const[showSchema,setShowSchema]=useState(false);
   const[schemaData,setSchemaData]=useState(null);
+  const[showReorder,setShowReorder]=useState(false);
+  const[reorderSections,setReorderSections]=useState([]);
+  const[dragIdx,setDragIdx]=useState(null);
   const[schemaLoading,setSchemaLoading]=useState(false);
   const msgsRef=useRef(null);
   const iframeRef=useRef(null);
@@ -3308,6 +3338,20 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
       toast('Build failed.','error');
     }
     setLoading(false);
+  };
+
+  const openReorder=()=>{
+    const sections=parseSectionsFromHtml(currentHtml);
+    if(!sections){toast('Not enough distinct sections to reorder on this page.','info');return;}
+    setReorderSections(sections);
+    setShowReorder(true);
+  };
+  const saveReorder=()=>{
+    const order=reorderSections.map(s=>s.id);
+    const newHtml=rebuildHtmlWithOrder(currentHtml,order);
+    setPages(p=>({...p,[activePage]:newHtml}));
+    setShowReorder(false);
+    toast('Section order updated.','success');
   };
 
   const downloadAll=()=>{
@@ -3440,6 +3484,7 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
           {builtCount>0&&<span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.58rem',letterSpacing:'2px',color:'#5a9070',textTransform:'uppercase'}}>{builtCount} page{builtCount>1?'s':''} built</span>}
           {builtCount>0&&<button className="btn btn-ghost btn-sm" onClick={downloadAll}>↓ Download All</button>}
           {currentHtml&&<button className="btn btn-ghost btn-sm" onClick={duplicatePage}>Clone Page</button>}
+          {currentHtml&&<button className="btn btn-ghost btn-sm" onClick={openReorder}>🧩 Reorder Sections</button>}
           {currentHtml&&<button className="btn btn-ghost btn-sm" onClick={generateSchema}>{showSchema?'Hide Preview':'Google Preview'}</button>}
           {builtCount>0&&<button className="btn btn-gold btn-sm" onClick={deployToGitHub} disabled={deploying}>{deploying?<><Spinner/>Deploying…</>:'Deploy to GitHub →'}</button>}
         </div>
@@ -3638,6 +3683,32 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
           :<div className="builder-prev-empty"><div className="builder-prev-empty-r">ᚲ</div><div className="builder-prev-empty-t">Preview will appear here</div><div className="builder-prev-empty-s">Describe a business and hit Build.</div></div>}
         </div>
       </div>
+
+      {showReorder&&(
+        <div className="modal-bg" onClick={e=>e.target.className==="modal-bg"&&setShowReorder(false)}>
+          <div className="modal" style={{maxWidth:480}}>
+            <div className="modal-title">Reorder Sections</div>
+            <div className="modal-sub">Drag to reorder — applies to the {activePage} page only.</div>
+            <div style={{display:'flex',flexDirection:'column',gap:6,margin:'12px 0'}}>
+              {reorderSections.map((s,i)=>(
+                <div key={s.id} draggable
+                  onDragStart={()=>setDragIdx(i)}
+                  onDragOver={e=>e.preventDefault()}
+                  onDrop={()=>{if(dragIdx===null||dragIdx===i)return;setReorderSections(prev=>{const arr=[...prev];const[moved]=arr.splice(dragIdx,1);arr.splice(i,0,moved);return arr;});setDragIdx(null);}}
+                  style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:'#0a0a14',border:'1px solid rgba(201,168,76,.1)',cursor:'grab'}}>
+                  <span style={{color:'#3a3848',fontSize:'.9rem'}}>⠿</span>
+                  <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.56rem',letterSpacing:'1.5px',color:'#c9a84c',textTransform:'uppercase',minWidth:60}}>{s.tag}</span>
+                  <span style={{fontSize:'.8rem',fontWeight:300,color:'#9a96a2',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.label}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{display:'flex',gap:10}}>
+              <button className="btn btn-gold" style={{flex:1}} onClick={saveReorder}>Save Order</button>
+              <button className="btn btn-ghost" onClick={()=>setShowReorder(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
