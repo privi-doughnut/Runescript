@@ -174,6 +174,53 @@ export default {
       }
     }
 
+    // ── STRIPE: Create one-time Template Purchase Checkout ──────────────────
+    // Same shape as /create-invoice-payment (inline price_data, no pre-created
+    // Stripe Price) but carries template/seller/buyer metadata through the
+    // session so the frontend can record a real template_sales row after
+    // /check-session confirms payment — see App.jsx MarketplacePage.
+    if (url.pathname === '/create-template-checkout' && request.method === 'POST') {
+      const stripeKey = env.RUNESCRIPT_STRIPE_API_KEY;
+      if (!stripeKey) {
+        return Response.json({ error: 'Stripe not configured' }, { status: 500, headers: cors });
+      }
+      try {
+        const { templateId, templateName, price, sellerId, buyerId, buyerEmail } = await request.json();
+        const cents = Math.round(Number(price) * 100);
+        if (!cents || cents < 1) {
+          return Response.json({ error: 'Invalid price' }, { status: 400, headers: cors });
+        }
+        const params = new URLSearchParams({
+          'payment_method_types[]': 'card',
+          'mode': 'payment',
+          'line_items[0][price_data][currency]': 'usd',
+          'line_items[0][price_data][unit_amount]': String(cents),
+          'line_items[0][price_data][product_data][name]': templateName || 'Template',
+          'line_items[0][quantity]': '1',
+          'metadata[templateId]': templateId || '',
+          'metadata[templateName]': templateName || '',
+          'metadata[sellerId]': sellerId || '',
+          'metadata[buyerId]': buyerId || '',
+          'success_url': 'https://runescript.netlify.app/?template_purchase=success&session_id={CHECKOUT_SESSION_ID}',
+          'cancel_url': 'https://runescript.netlify.app/?template_purchase=cancelled',
+        });
+        if (buyerEmail) params.set('customer_email', buyerEmail);
+        const resp = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${stripeKey}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+        });
+        const session = await resp.json();
+        if (session.error) return Response.json({ error: session.error.message }, { status: 400, headers: cors });
+        return Response.json({ url: session.url, sessionId: session.id }, { headers: cors });
+      } catch(e) {
+        return Response.json({ error: e.message }, { status: 500, headers: cors });
+      }
+    }
+
     // ── STRIPE: Verify Session After Checkout ──────────────────────────────
     if (url.pathname.startsWith('/check-session/') && request.method === 'GET') {
       const stripeKey = env.RUNESCRIPT_STRIPE_API_KEY;
@@ -192,6 +239,8 @@ export default {
           subscriptionId: session.subscription,
           email: session.customer_details?.email,
           name: session.customer_details?.name,
+          amountTotal: session.amount_total,
+          metadata: session.metadata || {},
         }, { headers: cors });
       } catch(e) {
         return Response.json({ error: e.message }, { status: 500, headers: cors });

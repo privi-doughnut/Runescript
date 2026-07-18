@@ -171,6 +171,26 @@ const createPaymentLink = async ({amount, description, clientName}) => {
   return data;
 };
 
+const createTemplateCheckout = async ({templateId, templateName, price, sellerId, buyerId, buyerEmail}) => {
+  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
+  const resp = await fetch(`${workerUrl}/create-template-checkout`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({templateId, templateName, price, sellerId, buyerId, buyerEmail}),
+  });
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+};
+
+const checkStripeSession = async (sessionId) => {
+  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
+  const resp = await fetch(`${workerUrl}/check-session/${sessionId}`);
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+};
+
 const callClaude = async (prompt, max=1400) => {
   // Trial credit limit check
   if (!window.MOCK_MODE && window.__trialLimit !== null && window.__trialLimit !== undefined) {
@@ -4551,23 +4571,92 @@ function AIStudioPage({prospects,toast}){
 }
 
 // ── MARKETPLACE ────────────────────────────────────────────────────────────
-function MarketplacePage({toast}){
+function MarketplacePage({toast,user}){
   const[tab,setTab]=useState("browse");
   const[catFilter,setCatFilter]=useState("All");
   const[searchQ,setSearchQ]=useState("");
   const[purchased,setPurchased]=useState(new Set());
   const[libraryTemplate,setLibraryTemplate]=useState(null);
   const[myTemplates,setMyTemplates]=useState([]);
+  const[communityTemplates,setCommunityTemplates]=useState([]);
+  const[mySales,setMySales]=useState([]);
+  const[myPurchaseSales,setMyPurchaseSales]=useState([]);
+  const[loadError,setLoadError]=useState('');
   const[previewTmpl,setPreviewTmpl]=useState(null);
   const[newTmpl,setNewTmpl]=useState({name:"",cat:"",desc:"",price:"",html:""});
+  const[submitting,setSubmitting]=useState(false);
+  const[buyingId,setBuyingId]=useState('');
   const CATS=["All","Agricultural","Auto & Transportation","Automotive Specialty","Beauty & Salon","Childcare & Nanny","Cleaning (Commercial)","Education & Kids","Electrical","Events & Entertainment","Fashion & Clothing","Fitness & Sports","Food Production","Funeral & Memorial","HVAC","Health & Wellness","Home Renovation","Home Services","Hospitality","IT & Computer Repair","Interior Decoration","Marine Services","Medical Specialists","Mental Health","Music & Audio","Nonprofit & Community","Personal Development","Pet Services","Photography & Creative","Plumbing","Professional Services","Real Estate","Religious Organizations","Restaurant","Retail & Shops","Roofing","Senior Care","Spa & Relaxation","Sports Coaching","Tech & Digital","Travel & Tourism","Wedding Services"];
-  const filtered=MOCK_TEMPLATES.filter(t=>(catFilter==="All"||t.cat===catFilter)&&(searchQ===""||t.name.toLowerCase().includes(searchQ.toLowerCase())||t.cat.toLowerCase().includes(searchQ.toLowerCase())));
-  const buy=t=>{setPurchased(prev=>new Set([...prev,t.id]));toast(`${t.name} purchased for $${t.price}.`,"success");};
-  const submitTemplate=()=>{if(!newTmpl.name||!newTmpl.cat||!newTmpl.price){toast("Fill in all fields.","error");return;}setMyTemplates(prev=>[...prev,{...newTmpl,id:uid(),rating:0,reviews:0,seller:"You",createdAt:now(),sales:0}]);setNewTmpl({name:"",cat:"",desc:"",price:"",html:""});toast("Template submitted.","success");};
+
+  const loadMarketplaceData=async()=>{
+    if(!user?.id)return;
+    setLoadError('');
+    try{
+      const[communityRes,mySalesRes,myPurchasesRes,myTemplatesRes]=await Promise.all([
+        sb.from('templates').select('*').order('created_at',{ascending:false}),
+        sb.from('template_sales').select('*').eq('seller_user_id',user.id),
+        sb.from('template_sales').select('*').eq('buyer_user_id',user.id),
+        sb.from('templates').select('*').eq('seller_user_id',user.id).order('created_at',{ascending:false}),
+      ]);
+      if(communityRes.error)throw communityRes.error;
+      setCommunityTemplates((communityRes.data||[]).map(t=>({
+        id:t.id,name:t.name,cat:t.category,desc:t.description||'',price:Number(t.price),
+        rating:Number(t.rating||0),reviews:t.reviews||0,seller:t.seller_name||'Community Creator',
+        seller_user_id:t.seller_user_id,colors:t.colors||['#c9a84c','#1a1a2e'],
+      })));
+      if(!mySalesRes.error)setMySales(mySalesRes.data||[]);
+      if(!myPurchasesRes.error){
+        setMyPurchaseSales(myPurchasesRes.data||[]);
+        setPurchased(prev=>new Set([...prev,...myPurchasesRes.data.map(s=>s.template_id)]));
+      }
+      if(!myTemplatesRes.error)setMyTemplates(myTemplatesRes.data||[]);
+    }catch(e){
+      setLoadError('Could not load marketplace data — has SUPABASE_FINAL.sql been run yet?');
+    }
+  };
+  useEffect(()=>{loadMarketplaceData();},[user?.id]);
+
+  const allTemplates=[...MOCK_TEMPLATES,...communityTemplates];
+  const filtered=allTemplates.filter(t=>(catFilter==="All"||t.cat===catFilter)&&(searchQ===""||t.name.toLowerCase().includes(searchQ.toLowerCase())||t.cat.toLowerCase().includes(searchQ.toLowerCase())));
+
+  const buy=async t=>{
+    if(!user?.id){toast('Please sign in first.','error');return;}
+    setBuyingId(t.id);
+    try{
+      const{url}=await createTemplateCheckout({
+        templateId:t.id,templateName:t.name,price:t.price,
+        sellerId:t.seller_user_id||'',buyerId:user.id,buyerEmail:user.email,
+      });
+      window.location.href=url;
+    }catch(e){
+      toast('Checkout failed: '+(e.message||''),'error');
+      setBuyingId('');
+    }
+  };
+
+  const submitTemplate=async()=>{
+    if(!newTmpl.name||!newTmpl.cat||!newTmpl.price){toast("Fill in all fields.","error");return;}
+    if(!user?.id){toast('Please sign in first.','error');return;}
+    setSubmitting(true);
+    try{
+      const{error}=await sb.from('templates').insert({
+        seller_user_id:user.id,seller_name:user.name||user.email,
+        name:newTmpl.name,category:newTmpl.cat,description:newTmpl.desc,
+        price:Number(newTmpl.price)||0,html:newTmpl.html,
+      });
+      if(error)throw error;
+      setNewTmpl({name:"",cat:"",desc:"",price:"",html:""});
+      toast("Template submitted — live in Browse now.","success");
+      loadMarketplaceData();
+    }catch(e){
+      toast('Could not submit — has SUPABASE_FINAL.sql been run yet? ('+(e.message||'')+')','error');
+    }
+    setSubmitting(false);
+  };
   return(
     <div>
       <div className="sh"><div><div className="sh-title">Marketplace</div><div className="sh-sub">Buy and sell premium templates</div></div><div className="sh-right">{["browse","sell","earnings"].map(t=><button key={t} className={`btn btn-ghost btn-sm${tab===t?" btn-outline-gold":""}`} onClick={()=>setTab(t)}>{t.charAt(0).toUpperCase()+t.slice(1)}</button>)}</div></div>
-      {tab==="browse"&&<div className="mkt-layout"><div className="mkt-sidebar"><input className="inp" placeholder="Search templates…" value={searchQ} onChange={e=>setSearchQ(e.target.value)} style={{marginBottom:12}}/><div className="mkt-filter-title">Category</div>{CATS.map(c=><button key={c} className={`mkt-filter-btn${catFilter===c?" on":""}`} onClick={()=>setCatFilter(c)}>{c}</button>)}</div><div className="mkt-content"><div className="tmpl-grid">{filtered.map(t=><div key={t.id} className="tmpl-card"><div className="tmpl-preview" style={{background:`linear-gradient(135deg, ${t.colors[0]} 0%, ${t.colors[1]}33 100%)`}}>{t.featured&&<span style={{position:"absolute",top:8,left:8}} className="badge b-gold">Featured</span>}<span className="tmpl-preview-txt">{t.name[0]}</span></div><div className="tmpl-info"><div className="tmpl-name">{t.name}</div><div className="tmpl-cat">{t.cat}</div><div style={{fontSize:".74rem",fontWeight:300,color:"#4a4858",lineHeight:1.55,marginBottom:8}}>{t.desc}</div><div className="tmpl-meta"><div className="tmpl-price">${t.price}</div><div className="tmpl-rating">★ {t.rating} ({t.reviews})</div></div><div className="tmpl-seller">by {t.seller}</div><div className="tmpl-actions"><button className="btn btn-ghost btn-xs" onClick={()=>setPreviewTmpl(t)}>Preview</button>{purchased.has(t.id)?<span className="badge b-green" style={{padding:"4px 10px"}}>Purchased</span>:<button className="btn btn-gold btn-xs" onClick={()=>buy(t)}>Buy ${t.price}</button>}</div></div></div>)}</div></div></div>}
+      {tab==="browse"&&<div className="mkt-layout"><div className="mkt-sidebar"><input className="inp" placeholder="Search templates…" value={searchQ} onChange={e=>setSearchQ(e.target.value)} style={{marginBottom:12}}/><div className="mkt-filter-title">Category</div>{CATS.map(c=><button key={c} className={`mkt-filter-btn${catFilter===c?" on":""}`} onClick={()=>setCatFilter(c)}>{c}</button>)}</div><div className="mkt-content"><div className="tmpl-grid">{filtered.map(t=><div key={t.id} className="tmpl-card"><div className="tmpl-preview" style={{background:`linear-gradient(135deg, ${t.colors[0]} 0%, ${t.colors[1]}33 100%)`}}>{t.featured&&<span style={{position:"absolute",top:8,left:8}} className="badge b-gold">Featured</span>}<span className="tmpl-preview-txt">{t.name[0]}</span></div><div className="tmpl-info"><div className="tmpl-name">{t.name}</div><div className="tmpl-cat">{t.cat}</div><div style={{fontSize:".74rem",fontWeight:300,color:"#4a4858",lineHeight:1.55,marginBottom:8}}>{t.desc}</div><div className="tmpl-meta"><div className="tmpl-price">${t.price}</div><div className="tmpl-rating">★ {t.rating} ({t.reviews})</div></div><div className="tmpl-seller">by {t.seller}</div><div className="tmpl-actions"><button className="btn btn-ghost btn-xs" onClick={()=>setPreviewTmpl(t)}>Preview</button>{purchased.has(t.id)?<span className="badge b-green" style={{padding:"4px 10px"}}>Purchased</span>:<button className="btn btn-gold btn-xs" disabled={buyingId===t.id} onClick={()=>buy(t)}>{buyingId===t.id?<Spinner/>:`Buy $${t.price}`}</button>}</div></div></div>)}</div></div></div>}
       {tab==="__disabled_library"&&(
         <div>
           {[...Array.from(purchased).map(id=>MOCK_TEMPLATES.find(t=>t.id===id)).filter(Boolean),...(libraryTemplate?[libraryTemplate]:[])].length===0?(
@@ -4604,8 +4693,8 @@ function MarketplacePage({toast}){
           )}
         </div>
       )}
-      {tab==="sell"&&<div className="sell-form"><div className="card-title" style={{marginBottom:4}}>Submit a Template</div><div className="card-sub" style={{marginBottom:16}}>You earn 80% of every sale</div><div className="field"><label>Template Name</label><input className="inp" placeholder="ProContractor" value={newTmpl.name} onChange={e=>setNewTmpl(p=>({...p,name:e.target.value}))}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><div className="field"><label>Category</label><select className="inp" value={newTmpl.cat} onChange={e=>setNewTmpl(p=>({...p,cat:e.target.value}))}><option value="">— Select —</option>{CATS.filter(c=>c!=="All").map(c=><option key={c} value={c}>{c}</option>)}</select></div><div className="field"><label>Price ($)</label><input className="inp" type="number" placeholder="49" value={newTmpl.price} onChange={e=>setNewTmpl(p=>({...p,price:e.target.value}))}/></div></div><div className="field"><label>Description</label><textarea className="inp" rows={2} value={newTmpl.desc} onChange={e=>setNewTmpl(p=>({...p,desc:e.target.value}))}/></div><div className="field"><label>HTML Code</label><textarea className="inp" rows={4} placeholder="Paste your full HTML here…" value={newTmpl.html} onChange={e=>setNewTmpl(p=>({...p,html:e.target.value}))}/></div><button className="btn btn-gold btn-full" onClick={submitTemplate}>Submit Template</button></div>}
-      {tab==="earnings"&&<div><div className="earnings-grid">{[{n:`$${myTemplates.reduce((a,t)=>a+(t.sales||0)*Number(t.price)*.8,0).toFixed(2)}`,l:"Total Earnings"},{n:myTemplates.length,l:"Templates Listed"},{n:"80%",l:"Revenue Share"},{n:purchased.size,l:"Purchased"},{n:`$${MOCK_TEMPLATES.filter(t=>purchased.has(t.id)).reduce((a,t)=>a+t.price,0)}`,l:"Total Spent"},{n:"0",l:"Sales This Month"}].map((e,i)=><div key={i} className="earn-card"><div className="earn-n">{e.n}</div><div className="earn-l">{e.l}</div></div>)}</div></div>}
+      {tab==="sell"&&<div className="sell-form"><div className="card-title" style={{marginBottom:4}}>Submit a Template</div><div className="card-sub" style={{marginBottom:16}}>You earn 70% of every sale — paid out manually for now, see Earnings tab</div>{loadError&&<div style={{fontSize:'.78rem',color:'#e07878',padding:'10px 14px',background:'rgba(224,120,120,.08)',border:'1px solid rgba(224,120,120,.2)',marginBottom:12}}>{loadError}</div>}<div className="field"><label>Template Name</label><input className="inp" placeholder="ProContractor" value={newTmpl.name} onChange={e=>setNewTmpl(p=>({...p,name:e.target.value}))}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><div className="field"><label>Category</label><select className="inp" value={newTmpl.cat} onChange={e=>setNewTmpl(p=>({...p,cat:e.target.value}))}><option value="">— Select —</option>{CATS.filter(c=>c!=="All").map(c=><option key={c} value={c}>{c}</option>)}</select></div><div className="field"><label>Price ($)</label><input className="inp" type="number" placeholder="49" value={newTmpl.price} onChange={e=>setNewTmpl(p=>({...p,price:e.target.value}))}/></div></div><div className="field"><label>Description</label><textarea className="inp" rows={2} value={newTmpl.desc} onChange={e=>setNewTmpl(p=>({...p,desc:e.target.value}))}/></div><div className="field"><label>HTML Code</label><textarea className="inp" rows={4} placeholder="Paste your full HTML here…" value={newTmpl.html} onChange={e=>setNewTmpl(p=>({...p,html:e.target.value}))}/></div><button className="btn btn-gold btn-full" onClick={submitTemplate} disabled={submitting}>{submitting?<><Spinner/>Submitting…</>:'Submit Template'}</button></div>}
+      {tab==="earnings"&&<div><div className="earnings-grid">{[{n:`$${mySales.reduce((a,s)=>a+Number(s.creator_cut||0),0).toFixed(2)}`,l:"Total Earnings"},{n:myTemplates.length,l:"Templates Listed"},{n:"70%",l:"Revenue Share"},{n:mySales.length,l:"Sales"},{n:`$${myPurchaseSales.reduce((a,s)=>a+Number(s.amount||0),0).toFixed(2)}`,l:"Total Spent"},{n:`$${mySales.filter(s=>s.payout_status==='pending').reduce((a,s)=>a+Number(s.creator_cut||0),0).toFixed(2)}`,l:"Pending Payout"}].map((e,i)=><div key={i} className="earn-card"><div className="earn-n">{e.n}</div><div className="earn-l">{e.l}</div></div>)}</div><div style={{fontSize:'.7rem',color:'#3a3848',marginTop:14,lineHeight:1.7}}>Payouts are manual for now — the owner reviews pending sales and pays out directly (no automated Stripe Connect transfer yet). Balances above are computed from real recorded sales, not estimates.</div></div>}
               {previewTmpl&&(
           <div className="modal-bg" onClick={()=>setPreviewTmpl(null)}>
             <div style={{background:"#0d0d18",border:"1px solid rgba(201,168,76,.2)",width:"min(760px,92vw)",maxHeight:"88vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
@@ -4686,7 +4775,7 @@ function MarketplacePage({toast}){
                   {purchased.has(previewTmpl.id)?(
                     <button className="btn btn-gold btn-full" onClick={()=>setPreviewTmpl(null)}>✦ Already Purchased — In Your Library</button>
                   ):(
-                    <button className="btn btn-gold btn-full" onClick={()=>{buy(previewTmpl);setPreviewTmpl(null);}}>Buy for ${previewTmpl.price} →</button>
+                    <button className="btn btn-gold btn-full" disabled={buyingId===previewTmpl.id} onClick={()=>buy(previewTmpl)}>{buyingId===previewTmpl.id?<Spinner/>:`Buy for $${previewTmpl.price} →`}</button>
                   )}
                 </div>
               </div>
@@ -6764,6 +6853,24 @@ function CreatorPage({toast,user}) {
       .then(({data,error})=>{ if(!error&&data&&data.length>0)setApplied(true); }).catch(()=>{});
   },[user?.id]);
 
+  const [earnStats,setEarnStats]=useState({listed:0,sales:0,earnings:0,pending:0});
+  useEffect(()=>{
+    if(!user?.id)return;
+    Promise.all([
+      sb.from('templates').select('id',{count:'exact',head:true}).eq('seller_user_id',user.id),
+      sb.from('template_sales').select('creator_cut,payout_status').eq('seller_user_id',user.id),
+    ]).then(([tmplRes,salesRes])=>{
+      if(tmplRes.error||salesRes.error)return;
+      const sales=salesRes.data||[];
+      setEarnStats({
+        listed:tmplRes.count||0,
+        sales:sales.length,
+        earnings:sales.reduce((a,s)=>a+Number(s.creator_cut||0),0),
+        pending:sales.filter(s=>s.payout_status==='pending').reduce((a,s)=>a+Number(s.creator_cut||0),0),
+      });
+    }).catch(()=>{});
+  },[user?.id]);
+
   const loadApplications=async()=>{
     setLoadingApps(true);setAppsError('');
     try{
@@ -6815,7 +6922,7 @@ function CreatorPage({toast,user}) {
   };
 
   return(
-    <div><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:16}}>{[{l:'Templates Listed',v:'0',c:'#4a7aaa'},{l:'Total Sales',v:'0',c:'#7ac89a'},{l:'Earnings (70%)',v:'$0.00',c:'#c9a84c'},{l:'Pending Payout',v:'$0.00',c:'#9a6aaa'}].map(s=>(<div key={s.l} className="card" style={{textAlign:'center',padding:'14px 10px'}}><div style={{fontFamily:"'Cinzel',serif",fontSize:'1.3rem',fontWeight:700,color:s.c}}>{s.v}</div><div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.52rem',color:'#3a3848',letterSpacing:'1px',textTransform:'uppercase',marginTop:3}}>{s.l}</div></div>))}</div>
+    <div><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:16}}>{[{l:'Templates Listed',v:String(earnStats.listed),c:'#4a7aaa'},{l:'Total Sales',v:String(earnStats.sales),c:'#7ac89a'},{l:'Earnings (70%)',v:`$${earnStats.earnings.toFixed(2)}`,c:'#c9a84c'},{l:'Pending Payout',v:`$${earnStats.pending.toFixed(2)}`,c:'#9a6aaa'}].map(s=>(<div key={s.l} className="card" style={{textAlign:'center',padding:'14px 10px'}}><div style={{fontFamily:"'Cinzel',serif",fontSize:'1.3rem',fontWeight:700,color:s.c}}>{s.v}</div><div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.52rem',color:'#3a3848',letterSpacing:'1px',textTransform:'uppercase',marginTop:3}}>{s.l}</div></div>))}</div>
       <div className="sh"><div><div className="sh-title">Creator Program</div><div className="sh-sub">Get a free plan in exchange for authentic content</div></div></div>
       <div style={{background:'linear-gradient(135deg,rgba(201,168,76,.08) 0%,transparent 100%)',border:'1px solid rgba(201,168,76,.15)',padding:'28px 24px',marginBottom:20}}>
         <div style={{fontFamily:"'Cinzel',serif",fontSize:'1.4rem',fontWeight:700,color:'#ddd8ce',marginBottom:8}}>The deal is simple.</div>
@@ -8377,6 +8484,36 @@ export default function RuneScript(){
       window.history.replaceState({}, '', '/');
     }
 
+    // Handle template purchase return — records the real sale (and the
+    // creator's 70% cut, if this was a creator-submitted template rather
+    // than the built-in catalog) once Stripe confirms payment.
+    const templatePurchaseStatus = params.get('template_purchase');
+    const templateSessionId = params.get('session_id');
+    if (templatePurchaseStatus === 'success' && templateSessionId) {
+      checkStripeSession(templateSessionId).then(async session => {
+        if (session.status !== 'complete' && session.status !== 'open') return;
+        const meta = session.metadata || {};
+        const { data: { user: authUser } } = await sb.auth.getUser();
+        if (authUser && meta.templateId) {
+          const amount = (session.amountTotal || 0) / 100;
+          const sellerId = meta.sellerId || null;
+          const { error } = await sb.from('template_sales').insert({
+            template_id: meta.templateId,
+            template_name: meta.templateName || '',
+            seller_user_id: sellerId,
+            buyer_user_id: authUser.id,
+            amount,
+            creator_cut: sellerId ? Math.round(amount*0.7*100)/100 : 0,
+            stripe_session_id: templateSessionId,
+          });
+          if (!error) toast(`Purchase complete — ${meta.templateName||'template'} added to your library.`,'success');
+        }
+        window.history.replaceState({}, '', '/');
+      }).catch(() => {});
+    } else if (templatePurchaseStatus === 'cancelled') {
+      window.history.replaceState({}, '', '/');
+    }
+
     // Handle public proposal
     const proposalId = params.get('proposal');
     if (proposalId) {
@@ -8680,7 +8817,7 @@ export default function RuneScript(){
     builder:<SiteBuilderPage toast={toast} onSiteBuilt={()=>setSiteBuilt(true)} prospects={prospects}/>,
     agency:<AgencyOSPage prospects={prospects} proposals={proposals} addProposal={addProposal} updateProposal={updateProposal} invoices={invoices} addInvoice={addInvoice} updateInvoice={updateInvoice} toast={toast}/>,
     studio:<AIStudioPage prospects={prospects} toast={toast}/>,
-    marketplace:<MarketplacePage toast={toast}/>,
+    marketplace:<MarketplacePage toast={toast} user={user}/>,
     settings:<SettingsPage user={user} onUpdateUser={onUpdateUser} toast={toast} setProspects={setProspects} setPitches={setPitches} setProposals={setProposals} setInvoices={setInvoices} accentColor={accentColor} setAccentColor={setAccentColor} setScreen={setScreen}/>,
     library:<LibraryPage purchasedIds={purchasedTemplateIds} savedTemplates={savedTemplates} setPage={setPage} toast={toast}/>,
     domains:<DomainsPage toast={toast}/>,

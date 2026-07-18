@@ -116,7 +116,37 @@ create policy "users manage own sends" on sequence_sends
 -- SUPABASE_SERVICE_ROLE_KEY as a Cloudflare secret if/when the cron sender
 -- is wired up (see PROGRESS.md).
 
--- ── 4. Creator earnings / template sales ────────────────────────────────────
+-- ── 4. Creator-submitted marketplace templates ──────────────────────────────
+-- Previously "Submit a Template" only pushed to local component state — it
+-- vanished on reload and no other user could ever see or buy it. This table
+-- makes creator-submitted templates real and sellable, alongside the
+-- built-in curated catalog (which has no real seller and pays out nothing).
+create table if not exists templates (
+  id uuid primary key default gen_random_uuid(),
+  seller_user_id uuid references auth.users(id) on delete cascade not null,
+  seller_name text,   -- denormalized at insert time, avoids a cross-table join just to show "by X"
+  name text not null,
+  category text not null,
+  description text,
+  price numeric(10,2) not null,
+  html text,
+  colors text[] default array['#c9a84c','#1a1a2e'],
+  rating numeric(2,1) not null default 0,
+  reviews int not null default 0,
+  sales_count int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+alter table templates enable row level security;
+
+drop policy if exists "anyone can browse templates" on templates;
+create policy "anyone can browse templates" on templates for select using (true);
+
+drop policy if exists "sellers manage own templates" on templates;
+create policy "sellers manage own templates" on templates
+  for all using (auth.uid() = seller_user_id) with check (auth.uid() = seller_user_id);
+
+-- ── 5. Creator earnings / template sales ────────────────────────────────────
 create table if not exists template_sales (
   id uuid primary key default gen_random_uuid(),
   template_id text not null,
@@ -124,7 +154,7 @@ create table if not exists template_sales (
   seller_user_id uuid references auth.users(id),
   buyer_user_id uuid references auth.users(id),
   amount numeric(10,2) not null,
-  creator_cut numeric(10,2) not null,     -- 70% of amount, matches the UI's stated split
+  creator_cut numeric(10,2) not null,     -- 70% of amount for creator-submitted templates, 0 for the built-in catalog (no real seller to pay)
   stripe_session_id text,
   payout_status text not null default 'pending',  -- 'pending' | 'manual_paid'
   created_at timestamptz not null default now()
@@ -147,6 +177,22 @@ create policy "buyers record own purchase" on template_sales
 drop policy if exists "owner updates payout status" on template_sales;
 create policy "owner updates payout status" on template_sales
   for update using ((auth.jwt() ->> 'email') = 'prithivivijayakumar.work@gmail.com');
+
+-- Keeps templates.sales_count accurate without giving buyers write access to
+-- the templates table (RLS above only lets the seller write their own rows).
+-- security definer runs this with the function owner's privileges, bypassing
+-- RLS for just this one scoped increment.
+create or replace function increment_template_sales() returns trigger as $$
+begin
+  update templates set sales_count = sales_count + 1 where id::text = new.template_id;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists trg_increment_template_sales on template_sales;
+create trigger trg_increment_template_sales
+  after insert on template_sales
+  for each row execute function increment_template_sales();
 
 -- ============================================================================
 -- Done. After running this, tell Claude Code (or just refresh the app) —
