@@ -8084,7 +8084,15 @@ export default function RuneScript(){
         if(pr.status==="fulfilled"&&pr.value)setProposals(JSON.parse(pr.value.value));
         if(inv.status==="fulfilled"&&inv.value)setInvoices(JSON.parse(inv.value.value));
         if(u.status==="fulfilled"&&u.value){
-          const parsedUser=JSON.parse(u.value.value);setUser(parsedUser);
+          // Deliberately NOT calling setUser(parsedUser) here — this was a
+          // stale cache read racing against the real Supabase session-restore
+          // effect below, and whichever won was nondeterministic. A cached
+          // rs3_user only ever reflects whatever plan/comp status existed at
+          // the moment it was written (usually signup, always "apprentice"),
+          // never refreshed — so this path was silently overwriting correctly
+          // fetched plan data with stale "free" data on some page loads. The
+          // Supabase session-restore effect is the real source of truth; this
+          // block now only decides initial screen routing.
           try{
             const pref=await window.storage.get("rs3_autoredirect");
             if(pref&&JSON.parse(pref.value)===true){setScreen("app");}
@@ -8164,11 +8172,18 @@ export default function RuneScript(){
   },[]);
 
   // ── SUPABASE SESSION CHECK ─────────────────────────────────────────────
+  // Also resolves plan/trial/comp status on session restore — previously
+  // this only carried name/email/id, so a returning user's plan was always
+  // undefined (read as "free") regardless of what they'd actually paid for
+  // or been comped. See handleAuth for the same fix on the login path.
   useEffect(()=>{
-    sb.auth.getSession().then(({data:{session}})=>{
+    sb.auth.getSession().then(async({data:{session}})=>{
       if(session?.user){
         const u={name:session.user.user_metadata?.name||session.user.email.split('@')[0],email:session.user.email,id:session.user.id};
-        setUser(u);
+        const planInfo=await checkTrial(session.user.id);
+        const merged={...u,...planInfo};
+        setUser(merged);
+        setTrialLimits(merged.plan);
         loadSupabaseData(session.user.id);
       }
     }).catch(()=>{});
@@ -8238,33 +8253,64 @@ export default function RuneScript(){
     }catch(e){console.warn('Trial start error:',e.message);}
   };
 
-  const checkTrial=async(userId)=>{
-    try{
-      const{data}=await sb.from('profiles').select('plan,trial_ends_at').eq('id',userId).single();
-      if(data?.plan==='archon_trial'&&data?.trial_ends_at){
-        const trialEnd=new Date(data.trial_ends_at);
-        if(new Date()>trialEnd){
-          // Trial expired — downgrade
-          await sb.from('profiles').update({plan:'apprentice'}).eq('id',userId);
-          return{plan:'apprentice',trialExpired:true};
-        }
-        const daysLeft=Math.ceil((trialEnd-new Date())/(1000*60*60*24));
-        return{plan:'archon_trial',daysLeft};
+  // Resolves a user's effective plan from Supabase: comp_plan (owner-granted
+  // free access, e.g. approved Creator Program members) always wins if set;
+  // otherwise falls back to the real plan/trial status. comp_plan is a new
+  // column added by SUPABASE_FINAL.sql — until that's run, the query below
+  // that selects it will fail and this falls back to the pre-comp query
+  // shape so plan/trial loading keeps working either way.
+  const resolvePlan=(data,userId)=>{
+    if(data?.comp_plan)return Promise.resolve({plan:data.comp_plan,comped:true});
+    if(data?.plan==='archon_trial'&&data?.trial_ends_at){
+      const trialEnd=new Date(data.trial_ends_at);
+      if(new Date()>trialEnd){
+        sb.from('profiles').update({plan:'apprentice'}).eq('id',userId).then(()=>{}).catch(()=>{});
+        return Promise.resolve({plan:'apprentice',trialExpired:true});
       }
-      return{plan:data?.plan||'apprentice'};
-    }catch(e){return{plan:'apprentice'};}
+      const daysLeft=Math.ceil((trialEnd-new Date())/(1000*60*60*24));
+      return Promise.resolve({plan:'archon_trial',daysLeft});
+    }
+    return Promise.resolve({plan:data?.plan||'apprentice'});
+  };
+  const checkTrial=async(userId)=>{
+    // supabase-js resolves {data, error} rather than throwing on query errors
+    // (e.g. an unknown column) — checking only `data` via try/catch silently
+    // swallows failures as null data instead of triggering the fallback.
+    try{
+      const{data,error}=await sb.from('profiles').select('plan,trial_ends_at,comp_plan').eq('id',userId).single();
+      if(error)throw error;
+      return await resolvePlan(data,userId);
+    }catch(e){
+      try{
+        const{data,error}=await sb.from('profiles').select('plan,trial_ends_at').eq('id',userId).single();
+        if(error)throw error;
+        return await resolvePlan(data,userId);
+      }catch(e2){return{plan:'apprentice'};}
+    }
   };
 
   const handleAuth=async(u,isNew=false)=>{
-    setUser(u);setScreen("app");setPage("dashboard");
-    try{await window.storage.set("rs3_user",JSON.stringify(u));}catch(e){}
-    if(u.id)loadSupabaseData(u.id);
+    // checkTrial (below) fetches plan/trial/comp status from Supabase — the
+    // caller (AuthScreen) only knows name/email/id at this point. Previously
+    // this was never called anywhere, so a returning user's plan/comp status
+    // never loaded: they always appeared as free "Apprentice" regardless of
+    // what they'd actually paid for or been comped, and the trial-expiry
+    // warning below never fired since u.plan/u.daysLeft were always undefined.
+    let finalUser=u;
+    if(u.id&&!isNew){
+      const planInfo=await checkTrial(u.id);
+      finalUser={...u,...planInfo};
+      setTrialLimits(finalUser.plan);
+    }
+    setUser(finalUser);setScreen("app");setPage("dashboard");
+    try{await window.storage.set("rs3_user",JSON.stringify(finalUser));}catch(e){}
+    if(finalUser.id)loadSupabaseData(finalUser.id);
     if(isNew){
-      setTimeout(()=>toast(`🎉 Welcome to Rune Script, ${u.name||'friend'}! You're all set. Good luck out there.`,'success'),600);
+      setTimeout(()=>toast(`🎉 Welcome to Rune Script, ${finalUser.name||'friend'}! You're all set. Good luck out there.`,'success'),600);
       setTimeout(()=>setShowOnboarding(true),1800);
     }else{
-      setTimeout(()=>toast(`👋 Welcome back, ${u.name?.split(' ')[0]||'friend'}! Ready to close some deals?`,'success'),400);
-      if(u.plan==='archon_trial'&&u.daysLeft!=null){if(u.daysLeft<=1)setTimeout(()=>toast('⏰ Your trial ends today! Upgrade in Settings to keep Archon.','info'),2200);else if(u.daysLeft<=7)setTimeout(()=>toast(`⏰ ${u.daysLeft} days left in your trial. Upgrade anytime in Settings.`,'info'),2200);}
+      setTimeout(()=>toast(`👋 Welcome back, ${finalUser.name?.split(' ')[0]||'friend'}! Ready to close some deals?`,'success'),400);
+      if(finalUser.plan==='archon_trial'&&finalUser.daysLeft!=null){if(finalUser.daysLeft<=1)setTimeout(()=>toast('⏰ Your trial ends today! Upgrade in Settings to keep Archon.','info'),2200);else if(finalUser.daysLeft<=7)setTimeout(()=>toast(`⏰ ${finalUser.daysLeft} days left in your trial. Upgrade anytime in Settings.`,'info'),2200);}
       try{const seen=await window.storage.get('rs3_onboarded');if(!seen?.value)setTimeout(()=>setShowOnboarding(true),1000);}catch(e){}
     }
   };
