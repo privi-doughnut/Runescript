@@ -36,6 +36,7 @@ function startTierCheckout(tier,user,setScreen,toast) {
     .catch(()=>toast('Upgrade failed. Try again.','error'));
 }
 
+const OWNER_EMAIL = 'prithivivijayakumar.work@gmail.com';
 const uid = () => Math.random().toString(36).slice(2,10);
 const now = () => new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
 const scoreClass = s => s>=80?'b-green':s>=60?'b-gold':'b-red';
@@ -6606,18 +6607,80 @@ function EmailSequencePage({prospects,toast}) {
 
 
 // ── CREATOR PROGRAM STANDALONE PAGE ───────────────────────────────────────
-function CreatorPage({toast}) {
+function CreatorPage({toast,user}) {
   const [applied,setApplied]=useState(false);
   const [tier,setTier]=useState('archon');
   const [platform,setPlatform]=useState('');
   const [handle,setHandle]=useState('');
   const [followers,setFollowers]=useState('');
   const [why,setWhy]=useState('');
+  const [submitting,setSubmitting]=useState(false);
+  const isOwner=user?.email===OWNER_EMAIL;
+  const [applications,setApplications]=useState([]);
+  const [loadingApps,setLoadingApps]=useState(false);
+  const [appsError,setAppsError]=useState('');
   const TIERS=[
     {id:'archon',name:'Archon Creator',plan:'Archon ($99/mo)',req:'1,000+ engaged followers on any platform',perks:['Free Archon plan ($99/mo value)','Early access to new features','ᚱ Archon badge on your profile','Priority support','Monthly creator call with the team']},
     {id:'sovereign',name:'Sovereign Creator',plan:'Sovereign ($199/mo)',req:'5,000+ followers or strong portfolio',perks:['Free Sovereign plan ($199/mo value)','Co-marketing opportunities','Featured in Rune Script newsletter','Custom referral link with higher commission (25%)','Direct line to product team']},
     {id:'collab',name:'Collaboration Partner',plan:'Custom arrangement',req:'10,000+ followers or media presence',perks:['Custom platform arrangement','Revenue share on content-driven sales','Co-created tutorials and content','Speaking opportunities at Rune Script events','Equity consideration for long-term partners']},
   ];
+
+  useEffect(()=>{
+    if(!user?.id)return;
+    sb.from('creator_applications').select('status').eq('user_id',user.id).order('created_at',{ascending:false}).limit(1)
+      .then(({data,error})=>{ if(!error&&data&&data.length>0)setApplied(true); }).catch(()=>{});
+  },[user?.id]);
+
+  const loadApplications=async()=>{
+    setLoadingApps(true);setAppsError('');
+    try{
+      const{data,error}=await sb.from('creator_applications').select('*').order('created_at',{ascending:false});
+      if(error)throw error;
+      setApplications(data||[]);
+    }catch(e){
+      setAppsError('Could not load applications — has SUPABASE_FINAL.sql been run yet?');
+    }
+    setLoadingApps(false);
+  };
+  useEffect(()=>{ if(isOwner)loadApplications(); },[isOwner]);
+
+  const submitApplication=async()=>{
+    if(!platform||!handle||!followers||!why){toast('Fill in all fields.','error');return;}
+    if(!user?.id){toast('Please sign in first.','error');return;}
+    setSubmitting(true);
+    try{
+      const{error}=await sb.from('creator_applications').insert({
+        user_id:user.id,email:user.email,name:user.name,tier,platform,handle,followers,why,
+      });
+      if(error)throw error;
+      setApplied(true);
+      toast('Application submitted! We review within 72 hours.','success');
+      sendEmail({
+        to:OWNER_EMAIL,
+        subject:`New Creator Application — ${user.name||user.email} (${tier})`,
+        html:`<p><strong>${user.name||'Someone'}</strong> (${user.email}) applied for the <strong>${tier}</strong> creator tier.</p><p><strong>Platform:</strong> ${platform}<br/><strong>Handle:</strong> ${handle}<br/><strong>Followers:</strong> ${followers}</p><p><strong>Why:</strong> ${why}</p>`,
+      }).catch(()=>{});
+    }catch(e){
+      toast('Could not submit — has SUPABASE_FINAL.sql been run yet? ('+(e.message||'')+')','error');
+    }
+    setSubmitting(false);
+  };
+
+  const reviewApplication=async(app,newStatus)=>{
+    try{
+      const{error}=await sb.from('creator_applications').update({status:newStatus,reviewed_at:new Date().toISOString()}).eq('id',app.id);
+      if(error)throw error;
+      if(newStatus==='approved'&&(app.tier==='archon'||app.tier==='sovereign')){
+        const{error:profileErr}=await sb.from('profiles').update({comp_plan:app.tier,is_creator:true}).eq('id',app.user_id);
+        if(profileErr)toast('Application approved, but granting the comp plan failed: '+profileErr.message,'error');
+      }
+      toast(`Application ${newStatus}.`,'success');
+      loadApplications();
+    }catch(e){
+      toast('Action failed: '+(e.message||''),'error');
+    }
+  };
+
   return(
     <div><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:16}}>{[{l:'Templates Listed',v:'0',c:'#4a7aaa'},{l:'Total Sales',v:'0',c:'#7ac89a'},{l:'Earnings (70%)',v:'$0.00',c:'#c9a84c'},{l:'Pending Payout',v:'$0.00',c:'#9a6aaa'}].map(s=>(<div key={s.l} className="card" style={{textAlign:'center',padding:'14px 10px'}}><div style={{fontFamily:"'Cinzel',serif",fontSize:'1.3rem',fontWeight:700,color:s.c}}>{s.v}</div><div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.52rem',color:'#3a3848',letterSpacing:'1px',textTransform:'uppercase',marginTop:3}}>{s.l}</div></div>))}</div>
       <div className="sh"><div><div className="sh-title">Creator Program</div><div className="sh-sub">Get a free plan in exchange for authentic content</div></div></div>
@@ -6653,7 +6716,7 @@ function CreatorPage({toast}) {
             <textarea className="inp" rows={3} placeholder="Tell us how you plan to use Rune Script and what kind of content you'd make..." value={why} onChange={e=>setWhy(e.target.value)}/>
           </div>
           <div style={{display:'flex',gap:10,alignItems:'center'}}>
-            <button className="btn btn-gold" onClick={()=>{if(!platform||!handle||!followers||!why){toast('Fill in all fields.','error');return;}setApplied(true);toast('Application submitted! We review within 72 hours.','success');}}>Submit Application →</button>
+            <button className="btn btn-gold" onClick={submitApplication} disabled={submitting}>{submitting?<><Spinner/>Submitting…</>:'Submit Application →'}</button>
             <p style={{fontSize:'.74rem',fontWeight:300,color:'#3a3848',lineHeight:1.6}}>We review every application personally. No automated rejections.</p>
           </div>
         </div>
@@ -6662,6 +6725,35 @@ function CreatorPage({toast}) {
           <div style={{fontFamily:"'Cinzel',serif",fontSize:'2rem',color:'#c9a84c',marginBottom:12}}>✦</div>
           <div style={{fontFamily:"'Cinzel',serif",fontSize:'1.1rem',fontWeight:700,color:'#ddd8ce',marginBottom:8}}>Application Submitted</div>
           <p style={{fontSize:'.84rem',fontWeight:300,color:'#7a7888',lineHeight:1.8,maxWidth:400,margin:'0 auto'}}>We'll review your application within 72 hours and reach out via email. If approved, your free plan activates immediately.</p>
+        </div>
+      )}
+      {isOwner&&(
+        <div style={{marginTop:32}}>
+          <div className="sh"><div><div className="sh-title">Admin — Applications</div><div className="sh-sub">Only visible to the owner account</div></div><div className="sh-right"><button className="btn btn-ghost btn-sm" onClick={loadApplications}>↻ Refresh</button></div></div>
+          {loadingApps&&<div style={{textAlign:'center',padding:20}}><Spinner/></div>}
+          {appsError&&<div style={{fontSize:'.8rem',color:'#e07878',padding:'12px 16px',background:'rgba(224,120,120,.08)',border:'1px solid rgba(224,120,120,.2)',marginBottom:12}}>{appsError}</div>}
+          {!loadingApps&&!appsError&&applications.length===0&&<div className="empty"><div className="empty-sub">No applications yet.</div></div>}
+          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {applications.map(app=>(
+              <div key={app.id} className="card" style={{padding:16}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,flexWrap:'wrap'}}>
+                  <div>
+                    <div style={{fontFamily:"'Cinzel',serif",fontSize:'.92rem',fontWeight:700,color:'#ddd8ce'}}>{app.name||app.email} <span style={{fontSize:'.68rem',fontWeight:400,color:'#5a5868'}}>({app.email})</span></div>
+                    <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.58rem',letterSpacing:'1px',color:'#c9a84c',textTransform:'uppercase',marginTop:4}}>{app.tier} · {app.platform} · {app.followers} followers</div>
+                    <div style={{fontSize:'.6rem',color:'#3a3848',marginTop:2}}>{app.handle}</div>
+                  </div>
+                  <span className={`badge ${app.status==='approved'?'b-green':app.status==='rejected'?'b-red':'b-gold'}`}>{app.status}</span>
+                </div>
+                <p style={{fontSize:'.78rem',fontWeight:300,color:'#7a7888',lineHeight:1.6,marginTop:10}}>{app.why}</p>
+                {app.status==='pending'&&(
+                  <div style={{display:'flex',gap:8,marginTop:12}}>
+                    <button className="btn btn-gold btn-sm" onClick={()=>reviewApplication(app,'approved')}>Approve</button>
+                    <button className="btn btn-ghost btn-sm" onClick={()=>reviewApplication(app,'rejected')}>Reject</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -8450,7 +8542,7 @@ export default function RuneScript(){
     settings:<SettingsPage user={user} onUpdateUser={onUpdateUser} toast={toast} setProspects={setProspects} setPitches={setPitches} setProposals={setProposals} setInvoices={setInvoices} accentColor={accentColor} setAccentColor={setAccentColor} setScreen={setScreen}/>,
     library:<LibraryPage purchasedIds={purchasedTemplateIds} savedTemplates={savedTemplates} setPage={setPage} toast={toast}/>,
     domains:<DomainsPage toast={toast}/>,
-    creator:<CreatorPage toast={toast}/>,
+    creator:<CreatorPage toast={toast} user={user}/>,
     changelog:<ChangelogPage/>,
     rules:<RulesPage/>,
     coach:<CallCoachPage prospects={prospects} toast={toast}/>,
