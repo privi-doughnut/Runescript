@@ -13,3 +13,12 @@ name = "claude-proxy-prod"
 # After running `wrangler deploy`, set your API key with:
 # wrangler secret put ANTHROPIC_API_KEY
 # (It will prompt you to paste the key — never stored in this file)
+
+# Reference only — wrangler can't run in this dev environment (see CLAUDE.md),
+# so deploys and this schedule were configured directly via the Cloudflare
+# API, not through this file. Kept here so `wrangler deploy` reproduces the
+# same schedule if this ever runs somewhere wrangler works. Drives the
+# scheduled() handler in index.js (email sequence sender) every 15 minutes —
+# confirmed live via the Cloudflare API's /schedules endpoint.
+[triggers]
+crons = ["*/15 * * * *"]
