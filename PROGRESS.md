@@ -1,94 +1,70 @@
 # Rune Script — Progress Report
 
-_Last updated: 2026-07-15 (second session — bug-fix, templates, visual editor, and remaining-builds pass)_
+_Last updated: 2026-07-18 (third session — final code phase: Creator Program, email sequences, creator earnings, all backend-wired and live)_
 
-## The core fix this session: real browser verification
+## This session: finish backend-dependent features, verified in a real browser throughout
 
-Last session's biggest gap was that every UI change got verified by code review only — this machine's Node (v11.11.0, from 2019) couldn't run Vite at all, so nothing could actually be clicked. That's exactly why bugs shipped invisibly (Agency OS and AI Studio white-screened, AI features were completely broken, etc.) while every static check passed.
+Goal: get every remaining feature that needs code (not owner dashboard access) fully working, so what's left after this session is a clean, ordered list of owner-only tasks. Every feature below was clicked in a real running browser (Node 22 + Vite + Playwright/Chromium), not verified by code review alone — same standard as last session, continued.
 
-This session fixed the root cause first: upgraded Node to v22 via nvm (Homebrew is unrepairable on this machine — too old for the current macOS), got Vite running, and installed Playwright + Chromium to actually drive the app in a real browser. Every fix and every new feature below was clicked, not just read.
+Three features needed new Supabase tables. Since this session only has the anon key (no schema-modification access), all required SQL was written into `SUPABASE_FINAL.sql` at the repo root — idempotent, safe to run multiple times. **The owner needs to run this in the Supabase SQL Editor** before these features have any data to work with. Every feature was built to fail gracefully (a clear toast/error message, not a white screen or silent no-op) until that SQL is run — and this was verified directly: the exact "has SUPABASE_FINAL.sql been run yet?" messages were confirmed to appear via real network responses (missing-table Postgres errors), with no crashes.
 
-## Bugs found and fixed (all reproduced and re-verified in a real browser)
+## Phase 1 — Creator Program (shipped)
 
-1. **Agency OS and AI Studio white screens (shared root cause).** A "Saved Library" UI block referencing `showLibrary`/`savedOutputs`/`scheduled` was physically misplaced inside `AgencyOSPage` (which has no use for those — likely copy-paste contamination), while `AIStudioPage`, which actually owns that feature, never declared the state at all. Removed the misplaced block, added the missing state to `AIStudioPage`, and rebuilt the Saved Library display there properly (with a working toggle button). Also fixed two more undeclared-variable bugs found in the same investigation: `brand` (referenced, never declared) and `activeTool` (referenced in Save/Schedule handlers, never declared — would only throw when clicked, which is why static review never caught it).
+The application form was previously frontend-only (`setApplied(true)` and nothing else). Now:
+- Applications save to Supabase (`creator_applications`).
+- The owner gets a notification email via the existing Resend `/send-email` Worker endpoint.
+- An admin panel (gated by `user.email === OWNER_EMAIL`) lists all applications with Approve/Reject actions.
+- Approving an Archon/Sovereign application sets `comp_plan` on the applicant's `profiles` row — no Stripe subscription manipulation, just a flag the app already respects.
 
-2. **AI features completely broken ("connection lost").** The root cause: `callClaude` — the single function every AI feature in the app routes through — was calling `https://api.anthropic.com/v1/messages` **directly from the browser**, bypassing the Cloudflare Worker proxy entirely, with no auth headers. Browsers can't call Anthropic's API directly; this is exactly why the Worker proxy exists. Fixed to route through the Worker, matching the pattern already used correctly by `sendEmail`/`createPaymentLink`/`startTierCheckout`.
+**Necessary fix found while wiring `comp_plan` through:** returning users always showed as free "Apprentice" regardless of what they'd actually paid for or been comped. Three compounding bugs: `checkTrial()` (which resolves plan/trial/comp status) was written but never called from anywhere; a stale `localStorage`-cache `setUser` call in the app's bootstrap effect was racing against and sometimes overwriting the real Supabase-fetched user; and Supabase query errors were being silently swallowed (`{data}` destructured without checking `{error}`, so a failing query returned `null` without throwing). Fixed all three and verified with a Playwright test: set a plan via REST using a real signed-up user's own session token, reload, confirm Settings shows the correct plan.
 
-3. **A second, previously-invisible bug found only after fixing #2:** once the frontend could actually reach the Worker, live testing surfaced that the Worker's hardcoded `model: 'claude-sonnet-4-20250514'` is deprecated (Anthropic returns 404). Updated to `claude-sonnet-5`. This bug was completely masked by bug #2 — a curl test against the Worker in isolation wouldn't have caught it without the exact broken model string.
+## Phase 2 — Email sequence scheduler (shipped)
 
-4. **Site Builder page generation was silently getting truncated mid-CSS.** Found while investigating why a freshly-built page reported "not enough distinct sections to reorder": downloaded the actual generated HTML and it ended mid-`@media` query — no closing `</style>`, no `<body>` at all. `max_tokens` was capped at 3500 (frontend) and 4000 (Worker), too low for a complete styled page. Raised both to 8000.
+The existing "Email Sequence Builder" only generated AI copy for a one-off outreach sequence — no persistence, no actual sending. Now:
+- Generated sequences can be saved (`email_sequences`/`sequence_steps`) and auto-enroll the target prospect (`sequence_enrollments`/`sequence_sends`, with per-step send times computed from each step's day offset).
+- A "Saved Sequences" panel lists a user's sequences and lets them enroll additional prospects into an existing one.
+- **Real gap found and fixed:** prospects in this app never carry an email address anywhere in the data model (verified via a full-file search — only Invoices/Proposals work around this today, with a `window.prompt()` at send time). Enrollment now does the same thing, rather than silently being unusable for every real prospect.
+- Sending is handled by a new `scheduled()` handler on the Worker (Cloudflare Cron Trigger, configured directly via the Cloudflare API since wrangler can't run here — confirmed live, firing every 15 minutes) that queries due, unsent `sequence_sends` using a service-role key and sends via Resend, idempotently. A matching `/process-sequences` HTTP endpoint does the identical work as a fallback, fired fire-and-forget on every app load in case the Cron Trigger ever proves unreliable.
+- Also added "Email Sequences" to the Cmd+K command palette — it was missing entirely, a real discoverability gap found while trying to navigate to the page myself to test it.
 
-5. **GitHub OAuth login error.** Diagnosed but not app-code-fixable: the redirect to GitHub is correctly formed (real client_id, correct Supabase callback URL), so the GitHub OAuth provider is properly configured in Supabase. The failure is almost certainly Supabase's Redirect URL allowlist not including the production origin — **owner needs to check** Supabase Dashboard → Authentication → URL Configuration → Redirect URLs includes `https://runescript.netlify.app`.
+**Still needs from the owner:** the `SUPABASE_SERVICE_ROLE_KEY` Cloudflare secret. Without it, `/process-sequences` and the cron handler both correctly no-op (`{skipped: true, reason: "..."}`) rather than erroring — confirmed live — but no emails will actually send until that secret is set.
 
-6. **No onboarding slideshow / "Watch the Tour" did nothing (shared root cause).** All the wiring existed (state, trigger event, the `OnboardingSlideshow` component itself) — but nothing anywhere in the render tree actually displayed the component. Added the missing render. Verified live: new-user signup now shows the 9-slide onboarding, and the Settings "Watch Tour Again" button correctly reopens it.
+## Phase 3 — Creator earnings backend (shipped, live-deployed)
 
-7. **Pay Link / section reorder "can't find it."** Both were already shipped in the previous session and confirmed present in the live bundle — they were unreachable because Agency OS was crashing (bug #1) and because building a page required working AI (bug #2/#3). Once those were fixed, both are reachable; also made "Edit Sections" a prominent gold button instead of a small ghost-style one for better discoverability.
+Marketplace's "Submit a Template" only pushed to local component state before — it vanished on reload and no other user could ever see or buy it, so there was no real seller to ever pay a cut to. Now:
+- A real `templates` table makes creator submissions persist and actually be browsable/buyable by other users, alongside the existing built-in catalog.
+- "Buy" goes through real Stripe Checkout (new `/create-template-checkout` Worker endpoint, same inline-price pattern as the existing `/create-invoice-payment`) instead of an instant fake client-side purchase. On return, the session is verified via `/check-session` and a real `template_sales` row is recorded with a 70% `creator_cut` for creator-submitted templates (0 for the built-in catalog, which has no real seller).
+- Every hardcoded `$0`/`0` stat (Marketplace's Earnings tab, Creator Program's stats bar) now runs a real query.
+- **Fixed a pre-existing inconsistency:** Marketplace's copy claimed an 80% creator share while Creator Program's stats label said 70%. Standardized on 70% per this phase's spec.
+- Stripe Connect automated payouts were out of scope for one session (real onboarding/KYC/webhook work) — the UI is explicit that payouts are "manual for now" rather than faking automation.
 
-8. **Search "doesn't work."** Investigated and found search itself works correctly — it was tested against a genuinely empty account. Re-verified with demo data loaded: search correctly returns real matches.
+**Live-verified, not just code-reviewed:** deployed the updated Worker via the Cloudflare API (all 9 existing secret bindings confirmed intact afterward), then created a real `$1` live Stripe Checkout session end-to-end via curl — got back a genuine `checkout.stripe.com` URL with correctly round-tripped metadata via `/check-session`. Not completed, no charge. Browser-verified the full click-to-redirect path separately (the live Worker call itself is CORS-blocked from `localhost` by design — same restriction that already covers AI generation, not something introduced this session or something I changed).
 
-9. **161 duplicate IDs in Marketplace template data**, found during the Phase 6 sweep via React's duplicate-key console warnings. Of 470 templates, only 309 had unique IDs. This was more than cosmetic — purchase state is tracked via `purchased.has(t.id)`, so buying one template could incorrectly mark a different template sharing that id as already purchased. Reassigned sequential unique IDs across all 470.
+## Phase 4 — Regression pass + remaining loose ends
 
-10. **Duplicate dashboard greeting.** `DashboardPage` rendered two separate "Good afternoon, Name" headers back to back (visible in nearly every dashboard screenshot this session) — leftover from what looks like an incomplete merge. They even used different hour cutoffs for the afternoon/evening boundary, so they could disagree with each other. Removed the redundant one.
+Re-verified last session's fixes still hold after all the Phase 1–3 changes: Agency OS and AI Studio both load with zero console errors, the onboarding slideshow still appears on signup, the dashboard shows exactly one greeting, all 470 Marketplace template IDs remain unique (no regression), and global search still returns real matches against real data.
 
-## New builds this session
+Confirmed the section editor's drag-and-drop is genuinely functional, not just present in code — tested with real mouse-drag events in a browser and watched two sections actually swap order. Duplicate/delete/Add Section controls are all there. The e-commerce Shop section is confirmed present in the Add Section palette with its documented CORS caveat (works on `runescript.netlify.app`/`*.netlify.app`; a customer's own domain needs to be added to `ALLOWED_ORIGINS` first — deliberately not touched, it's a production security setting).
 
-- **5 genuinely distinct, hand-built site templates** (Restaurant, Trades/Contractor, Salon/Spa, Fitness/Gym, Professional Services) replacing the old "same layout, different colors" problem — which turned out to have a real explanation: there was no template data at all, every "template" was just a business-type prompt fed through the same AI call. Each new template has its own typography pairing, color system, nav pattern, and section mix. Verified by rendering each standalone (desktop + mobile) before wiring in, and via the deployed app.
-- **A real section editor**, extending last session's basic reorder into: duplicate/delete sections, an "Add Section" palette (8 generic snippets: hero, about, services, gallery, testimonials, pricing, contact, footer, plus a Shop/e-commerce section — see below), and page-level undo/redo.
-- **Inline text editing and image replacement.** Click any text on the live preview to edit it directly; click any image to replace its URL. Found and fixed a real bug during testing (not just via review): the first version made the whole page one contentEditable region, and a triple-click-select-and-retype at an element boundary silently merged a heading with the following paragraph's text. Fixed by scoping contentEditable to individual leaf elements instead.
-- **Per-section background color control.**
-- **localStorage persistence for Site Builder pages** — these were pure in-memory React state before, silently lost on every refresh. Supabase itself is confirmed live again, but there's no table for this yet and I don't have schema-modification access (anon key only, no dashboard/service-role access) to create one — see the SQL below for the owner to run when convenient.
-- **E-commerce Shop section** — a scoped-down version of "products, cart, and checkout": each product gets a real, working Buy Now button using the existing `/create-invoice-payment` Worker endpoint (no persistent multi-item cart). Known limitation: this only works from origins the Worker's CORS allowlist covers (`runescript.netlify.app` and `*.netlify.app`) — a site deployed to a customer's own domain would need that origin added to `ALLOWED_ORIGINS` in `index.js` before checkout would work there. Deliberately didn't change that allowlist myself given it's a production security setting.
-- **Capacitor mobile wrapper — scaffolded, not built.** Node 22 unblocked the Capacitor CLI (previously required Node ≥22, this machine had v11). Installed the packages, initialized config, added both `android/` and `ios/` native project scaffolds, confirmed the web build is unaffected. On its own branch (`capacitor-mobile-wrapper`), **not merged to main** — I have no Xcode or Android Studio in this environment to actually open, build, or verify a real native app, so I'm not claiming that works. See owner steps below.
+Capacitor mobile wrapper: confirmed the `capacitor-mobile-wrapper` branch still exists, unmerged, and has now diverged significantly from `main` (main gained ~700 lines of `App.jsx` changes across this session). Not touched further — still needs Xcode/Android Studio, which this environment doesn't have.
 
-## Skipped, documented rather than half-built
+## Deploy verification
 
-**Email sequence scheduler.** Needs a Supabase table to track per-contact sequence position, which I can't create (no schema access). Exact SQL to unblock:
-```sql
-create table sequence_queue (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users not null,
-  contact_email text not null,
-  step int not null default 0,
-  subject text, body text,
-  send_after timestamptz not null,
-  sent boolean default false,
-  created_at timestamptz default now()
-);
-alter table sequence_queue enable row level security;
-create policy "users manage own sequence queue" on sequence_queue
-  for all using (auth.uid() = user_id);
-```
-Once this exists, the actual sending mechanism can use a Cloudflare Cron Trigger on the Worker (configurable via the Workers API, doesn't need wrangler) that queries due rows and sends via the existing `/send-email` endpoint.
-
-**Creator earnings backend.** Same blocker — the earnings panel needs a `template_sales` table to replace its hardcoded $0. No such table exists and I can't create one.
-
-**Real-time collaboration.** Large build (Supabase Realtime-based). Per the explicit instruction to document rather than half-ship something this size, I'm leaving this undesigned beyond noting Supabase Realtime is the right primitive — this needs a dedicated session to scope properly rather than a bolt-on here.
-
-**Push notifications.** Depends on Capacitor actually being built and running (it's only scaffolded), so this is downstream of that.
+- Compiled clean (0 esbuild errors) and zero duplicate function names after every edit, throughout.
+- **Clicked through all 26 pages** in the app (via the mobile nav, which lists every route) in a real browser after all changes: zero blank screens, zero JS console errors.
+- Worker deployed via the Cloudflare API (owner provided a fresh scoped token mid-session) — verified all 9 secret bindings survived, and the new endpoints (`/create-template-checkout`, `/check-session` with metadata, `/process-sequences`) all respond correctly live, not as "not configured" 500s.
+- Configured the Cron Trigger schedule (`*/15 * * * *`) via the Cloudflare API — confirmed via `/schedules`, and documented in `wrangler.toml` for reference even though wrangler itself can't run in this environment.
+- `public/sw.js` still doesn't exist (unchanged from last session — registration fails silently, no offline caching, harmless) — nothing to bump.
 
 ## Deploy infrastructure notes
 
-- **Netlify build credits are limited** — the owner flagged this mid-session. Pushes to `main` were batched for the rest of the session instead of pushing after every commit, to conserve remaining credits. Earlier in the session, before this was known, there was a long stretch (~20+ min, several pushes) where the live bundle hash didn't update; at the time this was investigated as a possible `package-lock.json`/`npm ci` issue and that lockfile was removed, but that diagnosis is likely wrong — the credits explanation fits better. Worth knowing: Worker deploys (via the Cloudflare API, separate from Netlify) were unaffected throughout and are confirmed live for every fix that touched `index.js`.
-- **No `.gitignore` existed before this session** — added one (was the reason `node_modules/` showed as untracked-but-not-ignored).
-- All Worker-side fixes (model, token limits) are confirmed live via direct API calls, independent of the Netlify situation.
+- Netlify build credits are still limited per the owner — all of this session's commits were made locally throughout and pushed to `main` in one batch at the end of the session, not per-commit.
+- Worker deploys (Cloudflare API, separate from Netlify) are unaffected by Netlify's credit situation either way, and are confirmed live for every change that touched `index.js` this session.
 
-## Owner-only tasks (unchanged core list, plus new ones from this session)
+## Owner-only tasks
 
-- Resume the paused Supabase project — **done, confirmed live** (queried it directly, got a real response).
-- Check Supabase Dashboard → Authentication → URL Configuration → Redirect URLs includes `https://runescript.netlify.app` (needed to fix GitHub login).
-- Run the `sequence_queue` SQL above (and a similar table for creator earnings) if the email scheduler / earnings backend are wanted — I don't have schema-modification access to do this myself.
-- Check Netlify's Site → Deploys for the actual build credit/quota status, and top up or wait for reset as needed.
-- If you want the Capacitor mobile app to go further: `npx cap open ios` (needs Xcode) or `npx cap open android` (needs Android Studio) on the `capacitor-mobile-wrapper` branch, configure app icons/splash, set up code signing, test on a simulator, then App Store Connect / Google Play Console for store submission.
-- If the e-commerce Shop section should work on customer-deployed sites (not just runescript.netlify.app), add their deployment origin(s) to `ALLOWED_ORIGINS` in `index.js`.
-- Submit the Google OAuth app for verification (needs privacy policy, homepage, demo video) — for per-client calendars.
-- Test live Stripe checkout with a real card + immediate refund — worth testing the new Shop/per-product checkout path too, not just subscription tiers.
-- Purchase runescript.app domain if desired.
-- Consider upgrading Node on this machine long-term (this session used nvm as a workaround; the system default Node is still v11.11.0 and Homebrew is broken, so a fresh session that doesn't know about the nvm install would hit the same wall — worth actually fixing Homebrew or documenting the nvm path permanently).
+See `OWNER_TODO.md` for the full, ordered checklist (unblocking items first). Short version: run `SUPABASE_FINAL.sql`, add the `SUPABASE_SERVICE_ROLE_KEY` Cloudflare secret, fix the GitHub OAuth redirect allowlist, confirm Netlify has rebuilt, test one real small Stripe payment + refund.
 
 ## Honest completion assessment
 
-Every phase in the original list was attempted and substantively completed, with real browser verification throughout — not code-review-only, which was explicitly the point of this session. Ten distinct bugs were found and fixed, several of which (the AI routing bug, the deprecated model, the truncated generation, the duplicate template IDs) were only discoverable by actually running the app, not by reading the code. Three items are cleanly documented as skipped rather than half-built, per explicit permission to do so when something is too large to do safely in this pass.
-
-The biggest residual risk: production (runescript.netlify.app) may lag behind what's described here if Netlify's build credits are exhausted — everything is correctly on GitHub `main` and the Worker is live either way, but the *live site* itself needs a Netlify rebuild to reflect the latest state once credits allow it.
-
-I'd put this at **~90% of the full ask complete** — the gap being the three explicitly-documented skips (each blocked by something outside this session's control: schema access, scope, or a dependency chain) and the Netlify credit situation limiting how much of this is *currently visible* on the live site versus verified-correct-and-waiting-to-deploy.
+All three backend-dependent features (Creator Program, email sequence scheduler, creator earnings) are fully code-complete and live-deployed, gracefully degrading everywhere the Supabase tables don't exist yet. They will start actually storing/sending real data the moment the owner runs the SQL — no further coding needed for the golden path. The one real gap: Stripe Connect automated payouts were explicitly scoped out (documented as "manual for now" rather than half-built), consistent with the instruction to document rather than fake automation when something is genuinely too large for one session.
