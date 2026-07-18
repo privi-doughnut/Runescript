@@ -22,6 +22,60 @@ const TIER_PRICE_ENV_KEYS = {
   warden: 'STRIPE_WARDEN_PRICE_ID',
 };
 
+// ── EMAIL SEQUENCE SCHEDULER: send due steps ────────────────────────────────
+// Requires the SUPABASE_SERVICE_ROLE_KEY secret (bypasses RLS so it can send
+// across all users' queued sends, not just one). Idempotent: only touches
+// rows where sent = false, and marks each sent immediately after a
+// successful Resend call, so re-running (cron retry, or the on-load
+// fallback below firing twice) never double-sends.
+const SUPABASE_URL = 'https://ydxshxiemmdygumddzyx.supabase.co';
+
+async function processDueSequenceSends(env) {
+  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY;
+  const resendKey = env['RUNESCRIPT(RESEND)_API_KEY'];
+  if (!serviceKey || !resendKey) {
+    return { skipped: true, reason: 'SUPABASE_SERVICE_ROLE_KEY or Resend key not configured' };
+  }
+  const nowIso = new Date().toISOString();
+  const dueResp = await fetch(
+    `${SUPABASE_URL}/rest/v1/sequence_sends?sent=eq.false&send_at=lte.${encodeURIComponent(nowIso)}&select=id,send_at,sequence_enrollments(contact_email,contact_name,status),sequence_steps(subject,body)&limit=200`,
+    { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
+  );
+  if (!dueResp.ok) {
+    return { error: `Supabase query failed: ${dueResp.status} ${await dueResp.text()}` };
+  }
+  const due = await dueResp.json();
+  let sent = 0, failed = 0, skippedInactive = 0;
+  for (const row of due) {
+    const enrollment = row.sequence_enrollments;
+    const step = row.sequence_steps;
+    if (!enrollment || !step || enrollment.status !== 'active') { skippedInactive++; continue; }
+    try {
+      const emailResp = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: 'Rune Script <onboarding@resend.dev>',
+          to: [enrollment.contact_email],
+          subject: step.subject || '(no subject)',
+          html: (step.body || '').replace(/\n/g, '<br/>'),
+        }),
+      });
+      const emailData = await emailResp.json();
+      if (emailData.error) throw new Error(emailData.error.message || 'Resend error');
+      await fetch(`${SUPABASE_URL}/rest/v1/sequence_sends?id=eq.${row.id}`, {
+        method: 'PATCH',
+        headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sent: true, sent_at: new Date().toISOString() }),
+      });
+      sent++;
+    } catch (e) {
+      failed++;
+    }
+  }
+  return { checked: due.length, sent, failed, skippedInactive };
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin') || '';
@@ -140,6 +194,20 @@ export default {
           name: session.customer_details?.name,
         }, { headers: cors });
       } catch(e) {
+        return Response.json({ error: e.message }, { status: 500, headers: cors });
+      }
+    }
+
+    // ── EMAIL SEQUENCE SCHEDULER: on-load fallback trigger ──────────────────
+    // The real sender is the scheduled() Cron Trigger below. This endpoint
+    // does the exact same idempotent work, callable over HTTP — the frontend
+    // fires it (fire-and-forget) on app load as a fallback in case the Cron
+    // Trigger isn't active. Safe to call as often as anyone likes.
+    if (url.pathname === '/process-sequences' && request.method === 'POST') {
+      try {
+        const result = await processDueSequenceSends(env);
+        return Response.json(result, { headers: cors });
+      } catch (e) {
         return Response.json({ error: e.message }, { status: 500, headers: cors });
       }
     }
@@ -281,5 +349,12 @@ export default {
     } catch(e) {
       return Response.json({ error: e.message }, { status: 500, headers: cors });
     }
-  }
+  },
+
+  // Cloudflare Cron Trigger entry point — configured via the Cloudflare API
+  // (schedules endpoint) since wrangler.toml isn't used for deploys here.
+  // See OWNER_TODO.md to confirm the trigger is active in the dashboard.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(processDueSequenceSends(env));
+  },
 };

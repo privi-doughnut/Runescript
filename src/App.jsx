@@ -5745,6 +5745,7 @@ function CommandPalette({setPage, prospects, onClose, toast}) {
     {label:'Template Library',icon:'ᚹ',action:()=>setPage('library')},
     {label:'Manage Domains',icon:'ᛜ',action:()=>setPage('domains')},
     {label:'Creator Program',icon:'ᚷ',action:()=>setPage('creator')},
+    {label:'Email Sequences',icon:'ᛇ',action:()=>setPage('sequence')},
     {label:'Help Center',icon:'ᚻ',action:()=>setPage('help')},
     {label:'Settings',icon:'ᚽ',action:()=>setPage('settings')},
     {label:"What's New",icon:'ᚻ',action:()=>setPage('changelog')},
@@ -6533,11 +6534,17 @@ function AffiliatePage({user,toast}) {
   );
 }
 
-function EmailSequencePage({prospects,toast}) {
+function EmailSequencePage({prospects,toast,user}) {
   const [selId,setSelId]=useState('');
   const [goal,setGoal]=useState('Close a web design deal');
   const [loading,setLoading]=useState(false);
   const [sequence,setSequence]=useState(null);
+  const [saving,setSaving]=useState(false);
+  const [savedSeqs,setSavedSeqs]=useState([]);
+  const [loadingSaved,setLoadingSaved]=useState(false);
+  const [savedError,setSavedError]=useState('');
+  const [enrollPick,setEnrollPick]=useState({});
+  const [enrollingId,setEnrollingId]=useState('');
 
   const generate=async()=>{
     const p=prospects.find(pr=>pr.id===selId);
@@ -6550,6 +6557,92 @@ function EmailSequencePage({prospects,toast}) {
       setSequence(parsed);toast('Sequence generated.','success');
     }catch(e){toast('Generation failed.','error');}
     setLoading(false);
+  };
+
+  const loadSequences=async()=>{
+    if(!user?.id)return;
+    setLoadingSaved(true);setSavedError('');
+    try{
+      const{data,error}=await sb.from('email_sequences').select('*,sequence_steps(count),sequence_enrollments(id,contact_name,contact_email,status,enrolled_at)').eq('user_id',user.id).order('created_at',{ascending:false});
+      if(error)throw error;
+      setSavedSeqs(data||[]);
+    }catch(e){
+      setSavedError('Could not load saved sequences — has SUPABASE_FINAL.sql been run yet?');
+    }
+    setLoadingSaved(false);
+  };
+  useEffect(()=>{loadSequences();},[user?.id]);
+
+  const buildSendRows=(steps,enrollmentId,enrolledAt)=>steps.map(st=>({
+    enrollment_id:enrollmentId,
+    step_id:st.id,
+    user_id:user.id,
+    send_at:new Date(enrolledAt.getTime()+(st.delay_days||0)*86400000).toISOString(),
+  }));
+
+  const enrollInto=async(sequenceId,steps,prospectId)=>{
+    const p=prospects.find(pr=>pr.id===prospectId);
+    if(!p){toast('Select a prospect to enroll.','error');return;}
+    // Prospects scraped/imported into this app never carry an email address
+    // (see ScannerPage/ImportExportPage) — same gap the Invoices/Proposals
+    // send flows work around with a prompt. Do the same here.
+    let contactEmail=p.email;
+    if(!contactEmail){
+      contactEmail=window.prompt(`Enter ${p.name}'s email to enroll them in this sequence:`);
+      if(!contactEmail){toast('Enrollment cancelled — no email provided.','info');return;}
+    }
+    try{
+      const enrolledAt=new Date();
+      const{data:enrollment,error:enrollErr}=await sb.from('sequence_enrollments').insert({
+        sequence_id:sequenceId,user_id:user.id,contact_email:contactEmail,contact_name:p.name,enrolled_at:enrolledAt.toISOString(),
+      }).select().single();
+      if(enrollErr)throw enrollErr;
+      if(steps.length>0){
+        const{error:sendErr}=await sb.from('sequence_sends').insert(buildSendRows(steps,enrollment.id,enrolledAt));
+        if(sendErr)throw sendErr;
+      }
+      toast(`${p.name} enrolled — ${steps.length} email${steps.length===1?'':'s'} scheduled.`,'success');
+      loadSequences();
+    }catch(e){
+      toast('Could not enroll — has SUPABASE_FINAL.sql been run yet? ('+(e.message||'')+')','error');
+    }
+  };
+
+  const saveAndSchedule=async()=>{
+    if(!user?.id){toast('Please sign in first.','error');return;}
+    if(!sequence?.steps?.length){toast('Generate a sequence first.','error');return;}
+    const emailSteps=sequence.steps.filter(s=>s.type==='Email');
+    if(emailSteps.length===0){toast('This sequence has no Email-type steps to automate — only Email steps can be scheduled for sending.','error');return;}
+    const p=prospects.find(pr=>pr.id===selId);
+    setSaving(true);
+    try{
+      const{data:seqRow,error:seqErr}=await sb.from('email_sequences').insert({
+        user_id:user.id,name:`${p?.name||'Sequence'} — ${goal}`,
+      }).select().single();
+      if(seqErr)throw seqErr;
+      const stepsPayload=emailSteps.map((s,i)=>({sequence_id:seqRow.id,step_order:i,delay_days:s.day||0,subject:s.subject||'(no subject)',body:s.body||''}));
+      const{data:stepRows,error:stepErr}=await sb.from('sequence_steps').insert(stepsPayload).select();
+      if(stepErr)throw stepErr;
+      toast('Sequence saved.','success');
+      if(p)await enrollInto(seqRow.id,stepRows,p.id);
+      loadSequences();
+    }catch(e){
+      toast('Could not save — has SUPABASE_FINAL.sql been run yet? ('+(e.message||'')+')','error');
+    }
+    setSaving(false);
+  };
+
+  const fetchStepsAndEnroll=async(seqId,prospectId)=>{
+    if(!prospectId){toast('Select a prospect first.','error');return;}
+    setEnrollingId(seqId);
+    try{
+      const{data:steps,error}=await sb.from('sequence_steps').select('*').eq('sequence_id',seqId).order('step_order',{ascending:true});
+      if(error)throw error;
+      await enrollInto(seqId,steps||[],prospectId);
+    }catch(e){
+      toast('Could not enroll — has SUPABASE_FINAL.sql been run yet? ('+(e.message||'')+')','error');
+    }
+    setEnrollingId('');
   };
 
   return(
@@ -6595,10 +6688,50 @@ function EmailSequencePage({prospects,toast}) {
                   </div>
                 </div>
               ))}
-              <button className="btn btn-ghost btn-sm" style={{marginTop:8,width:'100%'}} onClick={()=>{const all=sequence.steps.map((s,i)=>`--- DAY ${s.day} — ${s.type} ---\n${s.subject?'Subject: '+s.subject+'\n\n':''} ${s.body}`).join('\n\n');navigator.clipboard.writeText(all);toast('Full sequence copied.','success');}}>Copy Full Sequence</button>
+              <div style={{display:'flex',gap:8,marginTop:8}}>
+                <button className="btn btn-ghost btn-sm" style={{flex:1}} onClick={()=>{const all=sequence.steps.map((s,i)=>`--- DAY ${s.day} — ${s.type} ---\n${s.subject?'Subject: '+s.subject+'\n\n':''} ${s.body}`).join('\n\n');navigator.clipboard.writeText(all);toast('Full sequence copied.','success');}}>Copy Full Sequence</button>
+                <button className="btn btn-gold btn-sm" style={{flex:1}} onClick={saveAndSchedule} disabled={saving}>{saving?<><Spinner/>Saving…</>:'💾 Save & Auto-Send'}</button>
+              </div>
+              <div style={{fontSize:'.68rem',color:'#3a3848',marginTop:8,lineHeight:1.6}}>Only "Email" steps are automated — SMS and Call Script steps stay manual. Saving schedules the Email steps to send automatically to {prospects.find(pr=>pr.id===selId)?.name||'this prospect'} on the days shown above.</div>
             </>
           )}
           {!sequence&&!loading&&<div className="empty"><div className="empty-rune">ᚲ</div><div className="empty-title">No sequence yet</div><div className="empty-sub">Select a prospect and hit Generate.</div></div>}
+        </div>
+      </div>
+
+      <div style={{marginTop:32}}>
+        <div className="sh"><div><div className="sh-title">Saved Sequences</div><div className="sh-sub">Auto-sending on schedule via Cloudflare Cron</div></div><div className="sh-right"><button className="btn btn-ghost btn-sm" onClick={loadSequences}>↻ Refresh</button></div></div>
+        {loadingSaved&&<div style={{textAlign:'center',padding:20}}><Spinner/></div>}
+        {savedError&&<div style={{fontSize:'.8rem',color:'#e07878',padding:'12px 16px',background:'rgba(224,120,120,.08)',border:'1px solid rgba(224,120,120,.2)',marginBottom:12}}>{savedError}</div>}
+        {!loadingSaved&&!savedError&&savedSeqs.length===0&&<div className="empty"><div className="empty-sub">No saved sequences yet — generate one above and hit Save & Auto-Send.</div></div>}
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          {savedSeqs.map(seq=>(
+            <div key={seq.id} className="card" style={{padding:16}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,flexWrap:'wrap'}}>
+                <div>
+                  <div style={{fontFamily:"'Cinzel',serif",fontSize:'.92rem',fontWeight:700,color:'#ddd8ce'}}>{seq.name}</div>
+                  <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.58rem',letterSpacing:'1px',color:'#c9a84c',textTransform:'uppercase',marginTop:4}}>{seq.sequence_steps?.[0]?.count||0} steps · {seq.sequence_enrollments?.length||0} enrolled</div>
+                </div>
+                <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                  <select className="inp" style={{minWidth:160}} value={enrollPick[seq.id]||''} onChange={e=>setEnrollPick({...enrollPick,[seq.id]:e.target.value})}>
+                    <option value="">— Enroll a prospect —</option>
+                    {prospects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  <button className="btn btn-gold btn-sm" disabled={enrollingId===seq.id} onClick={()=>fetchStepsAndEnroll(seq.id,enrollPick[seq.id])}>{enrollingId===seq.id?<Spinner/>:'Enroll'}</button>
+                </div>
+              </div>
+              {seq.sequence_enrollments?.length>0&&(
+                <div style={{marginTop:12,display:'flex',flexDirection:'column',gap:4}}>
+                  {seq.sequence_enrollments.map(en=>(
+                    <div key={en.id} style={{fontSize:'.72rem',color:'#7a7888',display:'flex',justifyContent:'space-between'}}>
+                      <span>{en.contact_name||en.contact_email}</span>
+                      <span className={`badge ${en.status==='active'?'b-gold':'b-green'}`} style={{fontSize:'.58rem'}}>{en.status}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -8281,6 +8414,15 @@ export default function RuneScript(){
     }).catch(()=>{});
   },[]);
 
+  // Fallback for the email sequence scheduler in case the Cloudflare Cron
+  // Trigger isn't active: fire the same idempotent send-check on app load.
+  // Fire-and-forget — never blocks rendering, and safe to call repeatedly
+  // since the Worker only sends rows where sent = false.
+  useEffect(()=>{
+    const workerUrl=window.CLAUDE_ENDPOINT||'https://runescript.its-the-prithivi-show.workers.dev';
+    fetch(`${workerUrl}/process-sequences`,{method:'POST'}).catch(()=>{});
+  },[]);
+
   const toast=(msg,type="info")=>{const id=uid();setToasts(prev=>[...prev,{id,msg,type}]);setTimeout(()=>setToasts(prev=>prev.filter(t=>t.id!==id)),3200);};
   const setTrialLimits=(plan)=>{
     if(plan==='archon_trial'){
@@ -8555,7 +8697,7 @@ export default function RuneScript(){
     import:<ImportExportPage prospects={prospects} pitches={pitches} proposals={proposals} invoices={invoices} addProspect={addProspect} toast={toast}/>,
     roadmap:<RoadmapPage user={user} toast={toast}/>,
     affiliate:<AffiliatePage user={user} toast={toast}/>,
-    sequence:<EmailSequencePage prospects={prospects} toast={toast}/>,
+    sequence:<EmailSequencePage prospects={prospects} toast={toast} user={user}/>,
   };
 
   const loadDemo=()=>{
