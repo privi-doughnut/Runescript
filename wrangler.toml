@@ -1,24 +1,26 @@
-name = "claude-proxy"
+name = "runescript-worker"
 main = "index.js"
-compatibility_date = "2024-01-01"
-compatibility_flags = ["nodejs_compat"]
+compatibility_date = "2026-06-24"
+compatibility_flags = []
 
-# Routes — update "runescript" to your actual Cloudflare account subdomain
-# This makes the worker available at claude-proxy.YOUR-SUBDOMAIN.workers.dev
-# You can also add a custom route after deployment
+[build]
+command = "npm run build"
 
-[env.production]
-name = "claude-proxy-prod"
+# Serves the built frontend (npm run build -> dist/) from the same Worker
+# that already handles the API routes in index.js. Static files are matched
+# first; anything that doesn't match a file (e.g. /create-invoice-payment,
+# /send-email) falls through to the fetch() handler in index.js.
+[assets]
+directory = "./dist"
 
-# After running `wrangler deploy`, set your API key with:
-# wrangler secret put ANTHROPIC_API_KEY
-# (It will prompt you to paste the key — never stored in this file)
-
-# Reference only — wrangler can't run in this dev environment (see CLAUDE.md),
-# so deploys and this schedule were configured directly via the Cloudflare
-# API, not through this file. Kept here so `wrangler deploy` reproduces the
-# same schedule if this ever runs somewhere wrangler works. Drives the
-# scheduled() handler in index.js (email sequence sender) every 15 minutes —
-# confirmed live via the Cloudflare API's /schedules endpoint.
+# Confirmed live via the Cloudflare API's /schedules endpoint — drives the
+# scheduled() handler in index.js (email sequence sender) every 15 minutes.
 [triggers]
 crons = ["*/15 * * * *"]
+
+# Secrets (RUNESCRIPT_API_KEY, RUNESCRIPT_STRIPE_API_KEY,
+# RUNESCRIPT(RESEND)_API_KEY, RUNESCRIPT_GOOGLE_CLIENT_SECRET, and the 5
+# STRIPE_*_PRICE_ID secrets) are already set on this Worker directly via the
+# Cloudflare dashboard/API — they are NOT stored in this file and a git-
+# triggered build will not remove them. Only add new ones with
+# `wrangler secret put NAME`, never commit a value here.

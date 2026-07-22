@@ -7,47 +7,25 @@ Tagline: "Find prospects, pitch them, build their site, run your agency — all 
 ## Stack & where things live
 - **Frontend:** React (Vite). The ENTIRE app is one file: `src/App.jsx` (~8,000+ lines). Do not split it without asking.
 - **Supabase client:** `src/supabase.js` — exports `supabase`; App.jsx imports it as `sb`. Must always exist next to App.jsx.
-- **Worker:** `index.js` at repo ROOT (not in worker/). This is the Cloudflare Worker. `worker/index.js` is a STALE duplicate — ignore it. There is also a "deploy 2/" folder that is stale junk — ignore it.
+- **Worker:** `index.js` at repo ROOT (not in worker/). This is the Cloudflare Worker — serves both the API routes AND the built frontend (static assets), same script. `worker/index.js` is a STALE duplicate — ignore it. There is also a "deploy 2/" folder that is stale junk — ignore it.
 - **HTML entry:** `index.html` at root.
 - **PWA:** `public/site.webmanifest`. No `public/sw.js` exists (index.html registers one, fails silently — harmless, just means no offline caching).
-- **Build config:** `vite.config.js`, `package.json`, `netlify.toml`, `wrangler.toml` (wrangler.toml is stale/unused — it references a different Worker name; deploys don't go through it, see below).
+- **Build config:** `vite.config.js`, `package.json`, `wrangler.toml` (this is now the REAL, live deploy config — see below. `netlify.toml` is vestigial, left over from before the move to Cloudflare Pages/Workers; the site no longer deploys there).
 
 ## Live infrastructure
-- **Site:** https://runescript.netlify.app (Netlify auto-deploys on push to main — **Netlify build credits can run low**; batch commits and push together rather than per-commit when doing multiple small fixes)
-- **Worker:** https://runescript-worker.its-the-prithivi-show.workers.dev (Cloudflare, account id `468f18d6a560dc69a59ade8dfa4b3665`, script name `runescript-worker` — renamed from `runescript` by the owner on 2026-07-22; a separate, blank `runescript` script also exists on the account with zero secrets configured, deployed via `wrangler` from the owner's machine — do not confuse the two. If asked to deploy, deploy to `runescript-worker` (the one with all 9 secrets), not `runescript`.)
+- **Site + Worker (same deploy):** https://runescript-worker.its-the-prithivi-show.workers.dev — Cloudflare, account id `468f18d6a560dc69a59ade8dfa4b3665`, script name `runescript-worker`. This single Worker serves the built frontend (static assets from `dist/`, via the `[assets]` block in `wrangler.toml`) AND the API routes in `index.js` — static files are matched first, anything unmatched (e.g. `/create-invoice-payment`, `/send-email`) falls through to the Worker's `fetch()` handler. As of 2026-07-22 this script is **connected to the GitHub repo via Cloudflare Workers Builds** — every push to `main` triggers Cloudflare's own CI to run `npm run build` and deploy automatically. **This replaces both the old manual curl-based Worker deploy AND Netlify** — a plain `git push` to `main` is now the entire deploy step for everything, frontend and backend both.
+  - There is also a separate, blank `runescript` script on the same account (zero secrets configured, created via a one-off manual `wrangler deploy` from the owner's machine, unconnected to any CI) — do not confuse the two. Don't deploy anything there; it's not what's live. The owner may rename/delete it later.
+  - **Do not hand-roll a manual Cloudflare API deploy unless the owner explicitly asks for a one-off out-of-band deploy** (e.g. testing something before it's ready to push to `main`). The git-connected build is now the default path.
 - **GitHub:** github.com/privi-doughnut/Runescript (files at repo root)
 - **Supabase:** https://ydxshxiemmdygumddzyx.supabase.co (confirmed live; anon key in src/supabase.js)
 
 ## Environment gotcha (read this before touching wrangler/vite/capacitor)
-This machine's system Node is v11.11.0 (from 2019) and Homebrew is broken (crashes on its own macOS-version check, unrepairable without a working brew). This blocks `wrangler`, `vite`, and the Capacitor CLI outright — they need Node 18+ (Capacitor needs 22+). Workaround used successfully: install nvm, `nvm install 22`, then explicitly `export PATH="$HOME/.nvm/versions/node/v22.23.1/bin:$PATH"` before every command that needs it — this harness's shell does not auto-source `.zshrc`/`.zshenv` for non-interactive invocations, so the PATH export has to be repeated per command, not set once.
+This machine's system Node is v11.11.0 (from 2019) and Homebrew is broken (crashes on its own macOS-version check, unrepairable without a working brew). This blocks `wrangler`, `vite`, and the Capacitor CLI outright — they need Node 18+ (Capacitor needs 22+). Workaround used successfully: install nvm, `nvm install 22`, then explicitly `export PATH="$HOME/.nvm/versions/node/v22.23.1/bin:$PATH"` before every command that needs it — this harness's shell does not auto-source `.zshrc`/`.zshenv` for non-interactive invocations, so the PATH export has to be repeated per command, not set once. Note: even with Node 22, `wrangler deploy`/`wrangler dev` still don't work *in this specific sandboxed environment* — but that's no longer the deploy blocker it used to be, since Cloudflare's own git-connected build now handles deploys (see above). Node 22 is still needed here for `npm run build`/`vite` if you want to sanity-check a production build locally before pushing, and for Playwright-based browser verification via `npm run dev`.
 
 ## Deploy process
-1. **Frontend:** commit + push to `main` → Netlify rebuilds automatically (~2-3 min, when credits allow). No manual build needed.
-2. **Worker:** `wrangler deploy` does NOT work in this environment (see above). Deploy via the Cloudflare REST API directly with curl instead — see the gotchas below. GitHub storage does NOT deploy the Worker either way; it must be shipped to Cloudflare separately from the frontend push.
+**Just push to `main`.** Cloudflare Workers Builds (git-connected, set up 2026-07-22) runs `npm run build` and deploys the result — frontend static assets and the `index.js` Worker — as one script, automatically. No manual Netlify step, no manual Cloudflare API curl deploy. Verify a deploy landed by checking the live site/endpoints after pushing (Cloudflare's build takes a couple minutes; if secrets-dependent endpoints 500 with "not configured" right after a push, the build may still be in flight — wait and recheck before assuming something broke).
 
-### Worker deploy via API (no wrangler)
-Needs a Cloudflare API token scoped to `Account.Workers Scripts:Edit` (ask the owner to generate one at dash.cloudflare.com/profile/api-tokens if you don't have one — don't assume an old one is still valid).
-
-Two non-obvious gotchas:
-1. **Multipart filename must match `main_module`.** `curl -F "worker.js=@/path/to/index.js"` sets the filename to `index.js` from the local path, but Cloudflare resolves the module by filename, not field name — causes `"No such module: worker.js"`. Fix: `-F "worker.js=@/path/to/index.js;filename=worker.js;type=application/javascript+module"`.
-2. **Secrets need `keep_bindings`, not redeclaration.** Don't list existing `secret_text` bindings in the upload metadata (you don't have their values, and Cloudflare rejects the request if you try without one). Instead, omit `bindings` entirely and add `"keep_bindings": ["secret_text", "plain_text"]` to the metadata — this preserves all existing secrets without needing their values.
-
-Metadata shape:
-```json
-{
-  "main_module": "worker.js",
-  "compatibility_date": "2026-06-24",
-  "compatibility_flags": [],
-  "keep_bindings": ["secret_text", "plain_text"]
-}
-```
-```
-curl -X PUT "https://api.cloudflare.com/client/v4/accounts/468f18d6a560dc69a59ade8dfa4b3665/workers/scripts/runescript-worker" \
-  -H "Authorization: Bearer $CF_TOKEN" \
-  -F "metadata=<metadata.json;type=application/json" \
-  -F "worker.js=@/path/to/index.js;filename=worker.js;type=application/javascript+module"
-```
-Always verify after deploying: re-fetch `/workers/scripts/runescript-worker/settings` and confirm all bindings are still present, then hit a couple of live endpoints to confirm real behavior (not "not configured" 500s).
+If you ever genuinely need a manual out-of-band deploy (bypassing git, e.g. testing before committing) — the owner has a scoped Cloudflare API token they can provide; ask for it fresh each time rather than assuming an old one is still valid. The multipart-upload mechanics (filename-must-match-`main_module`, `keep_bindings` for preserving secrets without needing their values) are documented in this file's git history if ever needed again, but shouldn't be under the new setup.
 
 ## Worker endpoints (index.js)
 - `/` — Claude API proxy (model: `claude-sonnet-5`)
@@ -82,7 +60,7 @@ All 5 tiers are wired for checkout (Seeker $10, Scribe $49, Archon $99 w/ 30-day
 
 ## Known pending / follow-up items
 - Email sequence scheduler and creator earnings backend both need new Supabase tables — exact SQL is in PROGRESS.md. No schema-modification access from this session (anon key only).
-- GitHub OAuth login likely needs `https://runescript.netlify.app` added to Supabase's Redirect URL allowlist (owner-only, Supabase dashboard).
+- GitHub OAuth login likely needs the live site URL added to Supabase's Redirect URL allowlist (owner-only, Supabase dashboard → Authentication → URL Configuration). Was `https://runescript.netlify.app` — now that the site has moved to Cloudflare (`https://runescript-worker.its-the-prithivi-show.workers.dev`, see Live infrastructure above), that URL needs to be added there too (and the old Netlify one can probably stay or be removed, owner's call).
 - Capacitor mobile wrapper is scaffolded on branch `capacitor-mobile-wrapper` (not merged) — needs Xcode/Android Studio to actually build/test, which this environment doesn't have.
 - Google app verification (for per-client calendars) — owner must submit, needs privacy policy/homepage/demo video.
 - See PROGRESS.md and TRIAGE.md for full session-by-session history of what shipped and why.
