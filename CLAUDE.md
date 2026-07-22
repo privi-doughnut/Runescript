@@ -14,7 +14,7 @@ Tagline: "Find prospects, pitch them, build their site, run your agency — all 
 
 ## Live infrastructure
 - **Site:** https://runescript.netlify.app (Netlify auto-deploys on push to main — **Netlify build credits can run low**; batch commits and push together rather than per-commit when doing multiple small fixes)
-- **Worker:** https://runescript.its-the-prithivi-show.workers.dev (Cloudflare, account id `468f18d6a560dc69a59ade8dfa4b3665`, script name `runescript`)
+- **Worker:** https://runescript-worker.its-the-prithivi-show.workers.dev (Cloudflare, account id `468f18d6a560dc69a59ade8dfa4b3665`, script name `runescript-worker` — renamed from `runescript` by the owner on 2026-07-22; a separate, blank `runescript` script also exists on the account with zero secrets configured, deployed via `wrangler` from the owner's machine — do not confuse the two. If asked to deploy, deploy to `runescript-worker` (the one with all 9 secrets), not `runescript`.)
 - **GitHub:** github.com/privi-doughnut/Runescript (files at repo root)
 - **Supabase:** https://ydxshxiemmdygumddzyx.supabase.co (confirmed live; anon key in src/supabase.js)
 
@@ -42,12 +42,12 @@ Metadata shape:
 }
 ```
 ```
-curl -X PUT "https://api.cloudflare.com/client/v4/accounts/468f18d6a560dc69a59ade8dfa4b3665/workers/scripts/runescript" \
+curl -X PUT "https://api.cloudflare.com/client/v4/accounts/468f18d6a560dc69a59ade8dfa4b3665/workers/scripts/runescript-worker" \
   -H "Authorization: Bearer $CF_TOKEN" \
   -F "metadata=<metadata.json;type=application/json" \
   -F "worker.js=@/path/to/index.js;filename=worker.js;type=application/javascript+module"
 ```
-Always verify after deploying: re-fetch `/workers/scripts/runescript/settings` and confirm all bindings are still present, then hit a couple of live endpoints to confirm real behavior (not "not configured" 500s).
+Always verify after deploying: re-fetch `/workers/scripts/runescript-worker/settings` and confirm all bindings are still present, then hit a couple of live endpoints to confirm real behavior (not "not configured" 500s).
 
 ## Worker endpoints (index.js)
 - `/` — Claude API proxy (model: `claude-sonnet-5`)
