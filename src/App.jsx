@@ -2380,13 +2380,20 @@ function ScannerPage({onAdd,prospects,toast,setPage}){
   const[keyword,setKeyword]=useState("");
   const[loading,setLoading]=useState(false);
   const[results,setResults]=useState([]);
+  const[resultsSource,setResultsSource]=useState(''); // 'places' | 'ai' — drives the persistent AI-fallback notice
   const[added,setAdded]=useState(new Set(prospects.map(p=>p.name)));
   const[scannerLoaded,setScannerLoaded]=useState(false);
 
   // Persist scanner state so results/search fields survive navigating away
   // and back — previously pure component state, wiped every time this page
-  // unmounted.
+  // unmounted. React drops all effects/state-setter effects on unmount, so
+  // a scan that's still in flight when the user navigates away would
+  // normally finish against a dead component and its result silently
+  // vanish — scan() below writes results straight to storage on completion
+  // (not just via setResults) specifically so that still works, and the
+  // polling here picks it up if the user comes back before/after it lands.
   useEffect(()=>{
+    let pollTimer=null;
     window.storage.get('rs3_scanner_state').then(r=>{
       if(r?.value){
         try{
@@ -2398,17 +2405,35 @@ function ScannerPage({onAdd,prospects,toast,setPage}){
           if(saved.minReviews)setMinReviews(saved.minReviews);
           if(saved.count)setCount(saved.count);
           if(saved.keyword)setKeyword(saved.keyword);
+          if(saved.resultsSource)setResultsSource(saved.resultsSource);
         }catch(e){}
       }
+      return window.storage.get('rs3_scanner_scanning');
+    }).then(r=>{
+      if(r?.value==='true'){
+        setLoading(true);
+        pollTimer=setInterval(()=>{
+          window.storage.get('rs3_scanner_scanning').then(sr=>{
+            if(sr?.value!=='true'){
+              clearInterval(pollTimer);
+              window.storage.get('rs3_scanner_state').then(rr=>{
+                if(rr?.value)try{const saved=JSON.parse(rr.value);if(saved.results)setResults(saved.results);if(saved.resultsSource)setResultsSource(saved.resultsSource);}catch(e){}
+              }).catch(()=>{});
+              setLoading(false);
+            }
+          }).catch(()=>{});
+        },1500);
+      }
     }).catch(()=>{}).finally(()=>setScannerLoaded(true));
+    return ()=>{if(pollTimer)clearInterval(pollTimer);};
   },[]);
   useEffect(()=>{
     if(!scannerLoaded)return; // don't clobber saved state with blank initial values before load finishes
-    window.storage.set('rs3_scanner_state',JSON.stringify({results,city,cat,minRating,minReviews,count,keyword})).catch(()=>{});
-  },[scannerLoaded,results,city,cat,minRating,minReviews,count,keyword]);
+    window.storage.set('rs3_scanner_state',JSON.stringify({results,city,cat,minRating,minReviews,count,keyword,resultsSource})).catch(()=>{});
+  },[scannerLoaded,results,city,cat,minRating,minReviews,count,keyword,resultsSource]);
 
   const clearScanner=()=>{
-    setResults([]);setCity('');setCat('');setMinRating('');setMinReviews('');setCount('10');setKeyword('');setShowAdv(false);
+    setResults([]);setCity('');setCat('');setMinRating('');setMinReviews('');setCount('10');setKeyword('');setShowAdv(false);setResultsSource('');
     window.storage.delete('rs3_scanner_state').catch(()=>{});
     toast('Scanner reset.','info');
   };
@@ -2551,6 +2576,18 @@ If you have no reliable info, set confidence to "low" and fill what you can esti
     const recordHistory=p.recordHistory!==false;
     if(!targetCity){toast("Enter a city — that's all you need.","error");return;}
     setLoadingFn(true);setResultsFn([]);
+    // recordHistory doubles as "this is the primary scan, not a history-modal
+    // regen" — only the primary scan's progress/results need to survive the
+    // component unmounting if the user navigates away mid-scan.
+    if(recordHistory)window.storage.set('rs3_scanner_scanning','true').catch(()=>{});
+    const persistResultsDirect=(mapped,source)=>{
+      if(!recordHistory)return;
+      window.storage.get('rs3_scanner_state').then(r=>{
+        let saved={};
+        if(r?.value)try{saved=JSON.parse(r.value);}catch(e){}
+        return window.storage.set('rs3_scanner_state',JSON.stringify({...saved,results:mapped,resultsSource:source,city:targetCity,cat:targetCat,minRating:targetMinRating,minReviews:targetMinReviews,count:targetCount,keyword:targetKeyword}));
+      }).catch(()=>{});
+    };
     try{
       const businessType=targetCat||targetKeyword||"local service business";
       // Check for Google Places API key
@@ -2610,6 +2647,8 @@ If you have no reliable info, set confidence to "low" and fill what you can esti
           if(mapped.length===0){toast('No results matched your filters. Try lower minimums.','info');}
           else{
             setResultsFn(mapped);
+            persistResultsDirect(mapped,'places');
+            if(recordHistory)setResultsSource('places');
             toast(`Found ${mapped.length} real businesses in ${targetCity} via Google Places.`,'success');
             if(recordHistory)logRecentSearch({city:targetCity,cat:targetCat,count:targetCount,minRating:targetMinRating,minReviews:targetMinReviews,keyword:targetKeyword,resultCount:mapped.length,source:'places'});
           }
@@ -2625,10 +2664,13 @@ If you have no reliable info, set confidence to "low" and fill what you can esti
         const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
         const mapped=parsed.map(b=>({...b,id:uid(),city:targetCity,category:businessType,website:'none',status:'Not Contacted',notes:'',addedAt:now(),lastActivity:now()}));
         setResultsFn(mapped);
-        toast(`Generated ${parsed.length} example prospects. Add your Google Places API key in Settings for real businesses.`,'info');
+        persistResultsDirect(mapped,'ai');
+        if(recordHistory)setResultsSource('ai');
+        toast(`Generated ${parsed.length} example prospects — see the notice above the results.`,'info');
         if(recordHistory)logRecentSearch({city:targetCity,cat:targetCat,count:targetCount,minRating:targetMinRating,minReviews:targetMinReviews,keyword:targetKeyword,resultCount:mapped.length,source:'ai'});
       }
     }catch(e){console.error('Scan error:',e);toast(`Scan failed: ${e.message||'Try again.'}`, 'error');}
+    if(recordHistory)window.storage.set('rs3_scanner_scanning','false').catch(()=>{});
     setLoadingFn(false);
   };
 
@@ -2804,6 +2846,12 @@ If you have no reliable info, set confidence to "low" and fill what you can esti
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {results.length>0&&resultsSource==='ai'&&(
+        <div style={{fontSize:'.78rem',color:'#9a96a2',padding:'12px 16px',background:'rgba(201,168,76,.05)',border:'1px solid rgba(201,168,76,.15)',marginBottom:14,lineHeight:1.6}}>
+          <strong style={{color:'#c9a84c'}}>These are AI-generated example prospects, not real businesses</strong> — no Google Places API key is configured, so this is what the scanner shows instead of failing. Add a key in Settings for real, verified businesses.
         </div>
       )}
 
