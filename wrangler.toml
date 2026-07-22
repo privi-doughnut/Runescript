@@ -1,10 +1,19 @@
-name = "runescript-worker"
+name = "runescript"
 main = "index.js"
 compatibility_date = "2026-06-24"
 compatibility_flags = []
 
 [build]
 command = "npm run build"
+
+# Not a secret — Stripe Price IDs are identifiers, not credentials, and this
+# one was already visible in plaintext via the Cloudflare API. Declared here
+# because a plain "vars" binding that isn't in wrangler.toml gets silently
+# wiped by a git-connected wrangler deploy (unlike secret_text bindings,
+# which wrangler always leaves alone) — this exact thing happened once
+# already after the owner renamed the Worker, dropping this one binding.
+[vars]
+STRIPE_SEEKER_PRICE_ID = "price_1Ts6DlPOXcVqpgITQk84e8cF"
 
 # Serves the built frontend (npm run build -> dist/) from the same Worker
 # that already handles the API routes in index.js. Static files are matched
@@ -19,8 +28,10 @@ directory = "./dist"
 crons = ["*/15 * * * *"]
 
 # Secrets (RUNESCRIPT_API_KEY, RUNESCRIPT_STRIPE_API_KEY,
-# RUNESCRIPT(RESEND)_API_KEY, RUNESCRIPT_GOOGLE_CLIENT_SECRET, and the 5
-# STRIPE_*_PRICE_ID secrets) are already set on this Worker directly via the
-# Cloudflare dashboard/API — they are NOT stored in this file and a git-
-# triggered build will not remove them. Only add new ones with
-# `wrangler secret put NAME`, never commit a value here.
+# RUNESCRIPT(RESEND)_API_KEY, RUNESCRIPT_GOOGLE_CLIENT_SECRET, and 4 of the 5
+# STRIPE_*_PRICE_ID values — STRIPE_SEEKER_PRICE_ID is the one exception,
+# declared above in [vars] since it isn't actually sensitive) are already
+# set on this Worker directly via the Cloudflare dashboard/API — they are
+# NOT stored in this file and a git-triggered build will not remove them.
+# Only add new ones with `wrangler secret put NAME`, never commit a
+# genuinely sensitive value here.

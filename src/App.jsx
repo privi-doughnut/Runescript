@@ -26,7 +26,7 @@ const TIER_INFO = {
 
 function startTierCheckout(tier,user,setScreen,toast) {
   if (!user?.id) { setScreen('auth'); return; }
-  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript-worker.its-the-prithivi-show.workers.dev';
+  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
   fetch(`${workerUrl}/create-trial-checkout`,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -100,7 +100,7 @@ Warm regards,
 };
 
 const sendEmail = async ({to, subject, html, from}) => {
-  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript-worker.its-the-prithivi-show.workers.dev';
+  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
   const resp = await fetch(`${workerUrl}/send-email`, {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
@@ -156,11 +156,11 @@ const SECTION_SNIPPETS = [
   // one-click buy per product, a deliberately scoped-down version of "cart
   // and checkout"). Self-contained <script> since this runs on the
   // customer's own deployed site, not inside the Rune Script app.
-  {label:'Shop',tag:'section',html:'<section id="rs-shop" style="padding:70px 24px"><h2 style="font-size:1.8rem;text-align:center;margin-bottom:36px">Shop</h2><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:960px;margin:0 auto"><div class="rs-product" data-name="Product One" data-price="29.00" style="border:1px solid #e0e0e0;border-radius:8px;overflow:hidden"><div style="aspect-ratio:1;background:#eee"></div><div style="padding:16px"><h3 style="margin-bottom:6px">Product One</h3><p style="color:#666;margin-bottom:12px">$29.00</p><button onclick="rsBuyNow(this)" style="width:100%;padding:12px;background:#222;color:#fff;border:none;border-radius:4px;cursor:pointer">Buy Now</button></div></div><div class="rs-product" data-name="Product Two" data-price="49.00" style="border:1px solid #e0e0e0;border-radius:8px;overflow:hidden"><div style="aspect-ratio:1;background:#eee"></div><div style="padding:16px"><h3 style="margin-bottom:6px">Product Two</h3><p style="color:#666;margin-bottom:12px">$49.00</p><button onclick="rsBuyNow(this)" style="width:100%;padding:12px;background:#222;color:#fff;border:none;border-radius:4px;cursor:pointer">Buy Now</button></div></div><div class="rs-product" data-name="Product Three" data-price="79.00" style="border:1px solid #e0e0e0;border-radius:8px;overflow:hidden"><div style="aspect-ratio:1;background:#eee"></div><div style="padding:16px"><h3 style="margin-bottom:6px">Product Three</h3><p style="color:#666;margin-bottom:12px">$79.00</p><button onclick="rsBuyNow(this)" style="width:100%;padding:12px;background:#222;color:#fff;border:none;border-radius:4px;cursor:pointer">Buy Now</button></div></div></div><script>function rsBuyNow(btn){var card=btn.closest(".rs-product");var name=card.getAttribute("data-name");var price=card.getAttribute("data-price");var originalText=btn.textContent;btn.disabled=true;btn.textContent="Loading...";fetch("https://runescript-worker.its-the-prithivi-show.workers.dev/create-invoice-payment",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({amount:price,description:name})}).then(function(r){return r.json();}).then(function(data){if(data.url){window.location.href=data.url;}else{alert("Checkout failed. Please try again.");btn.disabled=false;btn.textContent=originalText;}}).catch(function(){alert("Checkout failed. Please try again.");btn.disabled=false;btn.textContent=originalText;});}</script></section>'},
+  {label:'Shop',tag:'section',html:'<section id="rs-shop" style="padding:70px 24px"><h2 style="font-size:1.8rem;text-align:center;margin-bottom:36px">Shop</h2><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:960px;margin:0 auto"><div class="rs-product" data-name="Product One" data-price="29.00" style="border:1px solid #e0e0e0;border-radius:8px;overflow:hidden"><div style="aspect-ratio:1;background:#eee"></div><div style="padding:16px"><h3 style="margin-bottom:6px">Product One</h3><p style="color:#666;margin-bottom:12px">$29.00</p><button onclick="rsBuyNow(this)" style="width:100%;padding:12px;background:#222;color:#fff;border:none;border-radius:4px;cursor:pointer">Buy Now</button></div></div><div class="rs-product" data-name="Product Two" data-price="49.00" style="border:1px solid #e0e0e0;border-radius:8px;overflow:hidden"><div style="aspect-ratio:1;background:#eee"></div><div style="padding:16px"><h3 style="margin-bottom:6px">Product Two</h3><p style="color:#666;margin-bottom:12px">$49.00</p><button onclick="rsBuyNow(this)" style="width:100%;padding:12px;background:#222;color:#fff;border:none;border-radius:4px;cursor:pointer">Buy Now</button></div></div><div class="rs-product" data-name="Product Three" data-price="79.00" style="border:1px solid #e0e0e0;border-radius:8px;overflow:hidden"><div style="aspect-ratio:1;background:#eee"></div><div style="padding:16px"><h3 style="margin-bottom:6px">Product Three</h3><p style="color:#666;margin-bottom:12px">$79.00</p><button onclick="rsBuyNow(this)" style="width:100%;padding:12px;background:#222;color:#fff;border:none;border-radius:4px;cursor:pointer">Buy Now</button></div></div></div><script>function rsBuyNow(btn){var card=btn.closest(".rs-product");var name=card.getAttribute("data-name");var price=card.getAttribute("data-price");var originalText=btn.textContent;btn.disabled=true;btn.textContent="Loading...";fetch("https://runescript.its-the-prithivi-show.workers.dev/create-invoice-payment",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({amount:price,description:name})}).then(function(r){return r.json();}).then(function(data){if(data.url){window.location.href=data.url;}else{alert("Checkout failed. Please try again.");btn.disabled=false;btn.textContent=originalText;}}).catch(function(){alert("Checkout failed. Please try again.");btn.disabled=false;btn.textContent=originalText;});}</script></section>'},
 ];
 
 const createPaymentLink = async ({amount, description, clientName}) => {
-  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript-worker.its-the-prithivi-show.workers.dev';
+  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
   const resp = await fetch(`${workerUrl}/create-invoice-payment`, {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
@@ -172,7 +172,7 @@ const createPaymentLink = async ({amount, description, clientName}) => {
 };
 
 const createTemplateCheckout = async ({templateId, templateName, price, sellerId, buyerId, buyerEmail}) => {
-  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript-worker.its-the-prithivi-show.workers.dev';
+  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
   const resp = await fetch(`${workerUrl}/create-template-checkout`, {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
@@ -184,7 +184,7 @@ const createTemplateCheckout = async ({templateId, templateName, price, sellerId
 };
 
 const checkStripeSession = async (sessionId) => {
-  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript-worker.its-the-prithivi-show.workers.dev';
+  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
   const resp = await fetch(`${workerUrl}/check-session/${sessionId}`);
   const data = await resp.json();
   if (data.error) throw new Error(data.error);
@@ -209,7 +209,7 @@ const callClaude = async (prompt, max=1400) => {
     if (p.includes('social') || p.includes('email campaign') || p.includes('ad copy')) return MOCK_RESPONSES.studio;
     return MOCK_RESPONSES.default;
   }
-  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript-worker.its-the-prithivi-show.workers.dev';
+  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
   const r = await fetch(`${workerUrl}/`,{
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({max_tokens:max,messages:[{role:'user',content:prompt}]})
@@ -7019,7 +7019,7 @@ function BookingPage({ user, toast }) {
   const [slotMins, setSlotMins] = useState('30');
   const [svcName, setSvcName] = useState('Consultation');
   const [copied, setCopied] = useState(false);
-  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript-worker.its-the-prithivi-show.workers.dev';
+  const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
 
   // Restore a saved token (session only) and handle the OAuth redirect hash.
   useEffect(() => {
@@ -7846,7 +7846,7 @@ function TrialSignupModal({onClose, onSignIn}) {
       const userId = data.user.id;
 
       // Step 2: Create Stripe Checkout Session (card required, 30-day trial)
-      const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript-worker.its-the-prithivi-show.workers.dev';
+      const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
       const resp = await fetch(`${workerUrl}/create-trial-checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -8451,7 +8451,7 @@ export default function RuneScript(){
     if (trialStatus === 'success' && sessionId) {
       setStripeReturn('success');
       // Verify session and activate the purchased plan
-      const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript-worker.its-the-prithivi-show.workers.dev';
+      const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
       fetch(`${workerUrl}/check-session/${sessionId}`)
         .then(r => r.json())
         .then(async session => {
@@ -8556,7 +8556,7 @@ export default function RuneScript(){
   // Fire-and-forget — never blocks rendering, and safe to call repeatedly
   // since the Worker only sends rows where sent = false.
   useEffect(()=>{
-    const workerUrl=window.CLAUDE_ENDPOINT||'https://runescript-worker.its-the-prithivi-show.workers.dev';
+    const workerUrl=window.CLAUDE_ENDPOINT||'https://runescript.its-the-prithivi-show.workers.dev';
     fetch(`${workerUrl}/process-sequences`,{method:'POST'}).catch(()=>{});
   },[]);
 
