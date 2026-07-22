@@ -374,30 +374,42 @@ export default {
     }
 
     // ── CLAUDE API PROXY ───────────────────────────────────────────────────
-    const anthropicKey = env.RUNESCRIPT_API_KEY;
-    if (!anthropicKey) {
-      return Response.json({ error: 'API key not configured' }, { status: 500, headers: cors });
+    // Deliberately NOT mounted at "/" — this Worker also serves the built
+    // frontend as static assets (see wrangler.toml [assets]), and "/" always
+    // resolves to index.html at the assets layer before any request reaches
+    // this fetch handler, regardless of HTTP method. A POST/OPTIONS to "/"
+    // was returning 405 from the assets layer itself, breaking every AI
+    // feature in the app (Prospect Scanner, Pitch Generator, AI Studio, Site
+    // Builder, all route through this one endpoint). Moved to a path that
+    // can't collide with a static file.
+    if (url.pathname === '/api/claude' && request.method === 'POST') {
+      const anthropicKey = env.RUNESCRIPT_API_KEY;
+      if (!anthropicKey) {
+        return Response.json({ error: 'API key not configured' }, { status: 500, headers: cors });
+      }
+      try {
+        const body = await request.json();
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': anthropicKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            ...body,
+            model: 'claude-sonnet-5',
+            max_tokens: Math.min(body.max_tokens || 1400, 8000),
+          }),
+        });
+        const data = await response.json();
+        return Response.json(data, { status: response.status, headers: cors });
+      } catch(e) {
+        return Response.json({ error: e.message }, { status: 500, headers: cors });
+      }
     }
-    try {
-      const body = await request.json();
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': anthropicKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          ...body,
-          model: 'claude-sonnet-5',
-          max_tokens: Math.min(body.max_tokens || 1400, 8000),
-        }),
-      });
-      const data = await response.json();
-      return Response.json(data, { status: response.status, headers: cors });
-    } catch(e) {
-      return Response.json({ error: e.message }, { status: 500, headers: cors });
-    }
+
+    return Response.json({ error: 'Not found' }, { status: 404, headers: cors });
   },
 
   // Cloudflare Cron Trigger entry point — configured via the Cloudflare API

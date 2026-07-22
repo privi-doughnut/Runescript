@@ -210,7 +210,7 @@ const callClaude = async (prompt, max=1400) => {
     return MOCK_RESPONSES.default;
   }
   const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
-  const r = await fetch(`${workerUrl}/`,{
+  const r = await fetch(`${workerUrl}/api/claude`,{
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({max_tokens:max,messages:[{role:'user',content:prompt}]})
   });
