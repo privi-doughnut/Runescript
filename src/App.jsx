@@ -1395,15 +1395,18 @@ function EmbeddedScanner({onGetStarted}) {
   const [cat, setCat] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState([]);
+  const [searchFailed, setSearchFailed] = useState(false);
 
+  // Deliberately real-data-only — no AI-fabricated businesses here. A
+  // prospecting tool showing invented companies that don't exist is
+  // actively misleading, not a helpful fallback, so this dead-ends
+  // honestly instead of ever inventing a result.
   const scan = async () => {
     if (!city) return;
-    setLoading(true); setResults([]);
+    setLoading(true); setResults([]); setSearchFailed(false);
     const type = cat || 'local service business';
-    // Try real Google Places results first (via the Worker proxy)
     try {
       const key = window.__PLACES_KEY || 'AIzaSyA-mPZjkn4fohWEedTC6NOjI7T2X5Dge8A';
-      const q = encodeURIComponent(`${type} in ${city}`);
       const resp = await fetch(`https://places.googleapis.com/v1/places:searchText`, {
         method: 'POST',
         headers: {
@@ -1414,6 +1417,7 @@ function EmbeddedScanner({onGetStarted}) {
         body: JSON.stringify({ textQuery: `${type} in ${city}`, maxResultCount: 8 }),
       });
       const data = await resp.json();
+      if (data.error) { setSearchFailed(true); setLoading(false); return; }
       if (data.places && data.places.length) {
         const mapped = data.places
           .filter(p => !p.websiteUri)  // no-website = best leads
@@ -1425,9 +1429,7 @@ function EmbeddedScanner({onGetStarted}) {
             return { name: p.displayName?.text || 'Local Business', rating, reviews, leadScore, services: (p.types || []).slice(0, 2).map(t => t.replace(/_/g, ' ')) };
           });
         if (mapped.length) { setResults(mapped); setLoading(false); return; }
-      }
-      // If every result had a website, show top few anyway as "already has site" comparison
-      if (data.places && data.places.length) {
+        // Every result had a website — show top few anyway as an "already has a site" comparison
         setResults(data.places.slice(0, 3).map(p => ({
           name: p.displayName?.text || 'Local Business',
           rating: p.rating || 4.5,
@@ -1437,20 +1439,8 @@ function EmbeddedScanner({onGetStarted}) {
         })));
         setLoading(false); return;
       }
-    } catch(e) { /* fall through to AI */ }
-    // Fallback: AI-generated realistic sample
-    try {
-      const prompt = `Generate exactly 5 realistic local businesses in ${city} in the "${type}" space that do NOT have a website. Return ONLY a valid JSON array. Each object: name (string), rating (number 4.5-5.0), reviews (integer 50-400), leadScore (integer 70-97), services (array of 2 strings).`;
-      const raw = await callClaude(prompt, 1200);
-      const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
-      setResults(parsed);
-    } catch(e) {
-      setResults([
-        {name:'Example HVAC Co', rating:4.9, reviews:203, leadScore:94, services:['AC Repair','Heating']},
-        {name:'City Best Plumbing', rating:4.8, reviews:147, leadScore:88, services:['Leak Repair','Drains']},
-        {name:'Pro Clean Services', rating:5.0, reviews:89, leadScore:96, services:['Deep Clean','Residential']},
-      ]);
-    }
+      setSearchFailed(true);
+    } catch(e) { setSearchFailed(true); }
     setLoading(false);
   };
 
@@ -1468,6 +1458,12 @@ function EmbeddedScanner({onGetStarted}) {
       {loading && (
         <div style={{display:'flex',alignItems:'center',gap:12,padding:'16px 0'}}>
           <Spinner/><span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.62rem',color:'#3a3848',letterSpacing:'2px',textTransform:'uppercase'}}>Scanning {city}…</span>
+        </div>
+      )}
+
+      {!loading&&searchFailed&&(
+        <div style={{padding:'16px 0',fontSize:'.82rem',fontWeight:300,color:'#5a5868',lineHeight:1.7}}>
+          Live search isn't available right now. Sign up free to use the full Prospect Scanner once it's back up.
         </div>
       )}
 
@@ -2492,34 +2488,12 @@ function ScannerPage({onAdd,prospects,toast,setPage}){
           toast('Business not found on Google. Please describe it so we can add it manually.','info');
         }
       }else{
-        // No Places key — use Claude to look up
-        const prompt=`Look up this business and return what you know as JSON: "${bizName.trim()}"${bizCity?' in '+bizCity:''}.
-Return ONLY: {"name":"","phone":"","address":"","services":[""],"description":"","website":"","confidence":"high|medium|low"}
-If you have no reliable info, set confidence to "low" and fill what you can estimate.`;
-        const raw=await callClaude(prompt,800);
-        try{
-          const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
-          if(parsed.confidence==='low'){
-            setNeedsDetail(true);
-            setManualBiz(prev=>({...prev,name:bizName}));
-            toast('Could not find reliable info. Please fill in the details below.','info');
-          }else{
-            const prospect={
-              id:uid(),name:parsed.name||bizName,phone:parsed.phone||'',
-              address:parsed.address||'',city:bizCity||'',
-              category:'Direct Referral',rating:0,reviews:0,
-              services:Array.isArray(parsed.services)?parsed.services:['Website Design'],
-              description:parsed.description||'',website:parsed.website||'none',
-              leadScore:75,status:'Not Contacted',notes:'',addedAt:now(),lastActivity:now(),
-            };
-            setResults([prospect]);
-            toast(`Found info for "${bizName}".`,'success');
-          }
-        }catch(e){
-          setNeedsDetail(true);
-          setManualBiz(prev=>({...prev,name:bizName}));
-          toast('Could not identify this business. Please fill in the details.','info');
-        }
+        // No Places key — no AI guessing at real business details either
+        // (an invented phone number or address is worse than none at all).
+        // Straight to manual entry, same as the "not found on Google" path.
+        setNeedsDetail(true);
+        setManualBiz(prev=>({...prev,name:bizName}));
+        toast('No Google Places API key configured. Please describe the business so we can add it manually.','info');
       }
     }catch(e){toast(`Lookup failed: ${e.message}`,'error');}
     setLookingUp(false);
@@ -2656,18 +2630,11 @@ If you have no reliable info, set confidence to "low" and fill what you can esti
           toast('No Google Places results. Try a broader search.','info');
         }
       }else{
-        // ── AI FALLBACK (no Places key) ─────────────────────────────────
-        const ratingClause=targetMinRating?`minimum ${targetMinRating} stars`:"any rating";
-        const reviewClause=targetMinReviews?`at least ${targetMinReviews} reviews`:"any number of reviews";
-        const prompt=`Generate exactly ${targetCount||10} realistic local businesses in ${targetCity} in the "${businessType}" space that do NOT have a website. ${targetKeyword?`Focus on: ${targetKeyword}.`:''} Return ONLY a valid JSON array. Each object: name, phone, address, rating (${ratingClause}), reviews (integer, ${reviewClause}), services (array of 3 strings), description (2 sentences about why they need a website), leadScore (55 to 98). Make names realistic.`;
-        const raw=await callClaude(prompt,Math.min(400*(Number(targetCount)||10)+400,8000));
-        const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
-        const mapped=parsed.map(b=>({...b,id:uid(),city:targetCity,category:businessType,website:'none',status:'Not Contacted',notes:'',addedAt:now(),lastActivity:now()}));
-        setResultsFn(mapped);
-        persistResultsDirect(mapped,'ai');
-        if(recordHistory)setResultsSource('ai');
-        toast(`Generated ${parsed.length} example prospects — see the notice above the results.`,'info');
-        if(recordHistory)logRecentSearch({city:targetCity,cat:targetCat,count:targetCount,minRating:targetMinRating,minReviews:targetMinReviews,keyword:targetKeyword,resultCount:mapped.length,source:'ai'});
+        // Deliberately no AI-fabrication fallback here — inventing
+        // businesses that don't exist is actively harmful for a
+        // prospecting tool, not a helpful degraded mode. Dead-end honestly.
+        if(recordHistory)setResultsSource('');
+        toast('No Google Places API key configured — add one in Settings to search for real businesses.','error');
       }
     }catch(e){console.error('Scan error:',e);toast(`Scan failed: ${e.message||'Try again.'}`, 'error');}
     if(recordHistory)window.storage.set('rs3_scanner_scanning','false').catch(()=>{});
@@ -2849,12 +2816,6 @@ If you have no reliable info, set confidence to "low" and fill what you can esti
         </div>
       )}
 
-      {results.length>0&&resultsSource==='ai'&&(
-        <div style={{fontSize:'.78rem',color:'#9a96a2',padding:'12px 16px',background:'rgba(201,168,76,.05)',border:'1px solid rgba(201,168,76,.15)',marginBottom:14,lineHeight:1.6}}>
-          <strong style={{color:'#c9a84c'}}>These are AI-generated example prospects, not real businesses</strong> — no Google Places API key is configured, so this is what the scanner shows instead of failing. Add a key in Settings for real, verified businesses.
-        </div>
-      )}
-
       {results.length>0&&(
         <div className="pros-grid">
           {results.map(p=>(
@@ -2943,9 +2904,10 @@ If you have no reliable info, set confidence to "low" and fill what you can esti
 
 // ── SAVED FOR LATER (WATCHLIST) ─────────────────────────────────────────────
 // Businesses saved from Prospect Scanner to look at later. Re-checks each
-// one against current info on open (Google Places if a key is configured,
-// best-effort AI re-check otherwise) and flags what changed since it was
-// saved — a real, honest signal with Places, an approximation without it.
+// one against current Google Places data on open and flags what changed
+// since it was saved. No Places key configured means no ground truth to
+// check against — items just go unchecked rather than being compared
+// against AI-guessed data presented as if it were a real signal.
 function WatchlistPage({toast,onAddToCRM,prospects,setPage}){
   const[items,setItems]=useState([]);
   const[loading,setLoading]=useState(true);
@@ -2955,38 +2917,37 @@ function WatchlistPage({toast,onAddToCRM,prospects,setPage}){
 
   const persist=(list)=>{setItems(list);window.storage.set('rs3_watchlist',JSON.stringify(list)).catch(()=>{});};
 
+  // No AI fallback here either — an invented rating/review count presented
+  // as a "detected change" would be actively misleading, not a helpful
+  // approximation. Without a Places key, a saved business simply isn't
+  // checked at all rather than being compared against guessed data.
   const checkOne=async(item,currentList,placesKey)=>{
+    if(!placesKey){
+      const updated=(currentList||items).map(it=>it.id===item.id?{...it,lastChecked:null,changes:null,checkedVia:'none'}:it);
+      persist(updated);
+      return updated;
+    }
     setCheckingId(item.id);
     let changes=[];
-    let checkedVia='ai';
     try{
-      let fresh=null;
-      if(placesKey){
-        const resp=await fetch('https://places.googleapis.com/v1/places:searchText',{
-          method:'POST',
-          headers:{'Content-Type':'application/json','X-Goog-Api-Key':placesKey,'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.rating,places.userRatingCount,places.websiteUri'},
-          body:JSON.stringify({textQuery:`${item.name} ${item.city||item.address||''}`,maxResultCount:1,languageCode:'en'}),
-        });
-        const data=await resp.json();
-        const p=data.places?.[0];
-        if(p){
-          fresh={rating:p.rating,reviews:p.userRatingCount,website:p.websiteUri||'none',phone:p.nationalPhoneNumber,address:p.formattedAddress};
-          checkedVia='places';
-        }
+      const resp=await fetch('https://places.googleapis.com/v1/places:searchText',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Goog-Api-Key':placesKey,'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.rating,places.userRatingCount,places.websiteUri'},
+        body:JSON.stringify({textQuery:`${item.name} ${item.city||item.address||''}`,maxResultCount:1,languageCode:'en'}),
+      });
+      const data=await resp.json();
+      const p=data.places?.[0];
+      if(p){
+        const fresh={rating:p.rating,reviews:p.userRatingCount,website:p.websiteUri||'none',phone:p.nationalPhoneNumber,address:p.formattedAddress};
+        if(fresh.rating!=null&&Number(fresh.rating).toFixed(1)!==Number(item.rating||0).toFixed(1))changes.push(`Rating: ${item.rating} → ${fresh.rating}`);
+        if(fresh.reviews!=null&&Number(fresh.reviews)!==Number(item.reviews||0))changes.push(`Reviews: ${item.reviews} → ${fresh.reviews}`);
+        const hadSite=item.website&&item.website!=='none';
+        const hasSite=fresh.website&&fresh.website!=='none';
+        if(hadSite!==hasSite)changes.push(hasSite?`Now has a website: ${fresh.website}`:'Website no longer listed');
+        if(fresh.phone&&item.phone&&fresh.phone!==item.phone)changes.push(`Phone: ${item.phone} → ${fresh.phone}`);
       }
-      if(!fresh){
-        const prompt=`Look up what you currently know about this business and return ONLY JSON: {"rating":number,"reviews":integer,"website":"url or none","phone":""}. Business: "${item.name}" in ${item.city||item.address||'unknown location'}.`;
-        const raw=await callClaude(prompt,300);
-        fresh=JSON.parse(raw.replace(/```json|```/g,'').trim());
-      }
-      if(fresh.rating!=null&&Number(fresh.rating).toFixed(1)!==Number(item.rating||0).toFixed(1))changes.push(`Rating: ${item.rating} → ${fresh.rating}`);
-      if(fresh.reviews!=null&&Number(fresh.reviews)!==Number(item.reviews||0))changes.push(`Reviews: ${item.reviews} → ${fresh.reviews}`);
-      const hadSite=item.website&&item.website!=='none';
-      const hasSite=fresh.website&&fresh.website!=='none';
-      if(hadSite!==hasSite)changes.push(hasSite?`Now has a website: ${fresh.website}`:'Website no longer listed');
-      if(fresh.phone&&item.phone&&fresh.phone!==item.phone)changes.push(`Phone: ${item.phone} → ${fresh.phone}`);
     }catch(e){ /* leave changes empty — a failed check isn't a detected change */ }
-    const updated=(currentList||items).map(it=>it.id===item.id?{...it,lastChecked:new Date().toISOString(),changes,checkedVia}:it);
+    const updated=(currentList||items).map(it=>it.id===item.id?{...it,lastChecked:new Date().toISOString(),changes,checkedVia:'places'}:it);
     persist(updated);
     setCheckingId('');
     return updated;
@@ -3017,7 +2978,7 @@ function WatchlistPage({toast,onAddToCRM,prospects,setPage}){
   return(
     <div>
       <div className="sh"><div><div className="sh-title">Saved for Later</div><div className="sh-sub">{items.length} business{items.length!==1?'es':''} saved from Prospect Scanner</div></div></div>
-      {!hasPlacesKey&&items.length>0&&<div style={{fontSize:'.74rem',color:'#5a5868',padding:'10px 14px',background:'rgba(201,168,76,.04)',border:'1px solid rgba(201,168,76,.1)',marginBottom:14}}>No Google Places API key configured — change detection here is a best-effort AI re-check, not verified real data. Add a Places key in Settings for reliable change flags.</div>}
+      {!hasPlacesKey&&items.length>0&&<div style={{fontSize:'.74rem',color:'#5a5868',padding:'10px 14px',background:'rgba(201,168,76,.04)',border:'1px solid rgba(201,168,76,.1)',marginBottom:14}}>No Google Places API key configured — saved businesses can't be checked for changes right now. Add a Places key in Settings to enable it.</div>}
       {loading?(
         <div style={{textAlign:'center',padding:40}}><Spinner lg/></div>
       ):items.length===0?(
