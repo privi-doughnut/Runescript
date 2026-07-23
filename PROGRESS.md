@@ -1,8 +1,41 @@
 # Rune Script — Progress Report
 
-_Last updated: 2026-07-18 (third session — final code phase: Creator Program, email sequences, creator earnings, all backend-wired and live)_
+_Last updated: 2026-07-22 (fourth session — Cloudflare migration, AI-routing fix, Prospect Scanner overhaul, watchlist, honest-data enforcement)_
 
-## This session: finish backend-dependent features, verified in a real browser throughout
+---
+
+## Fourth session (2026-07-21 / 07-22): infrastructure move + Scanner overhaul
+
+### Hosting moved from Netlify to Cloudflare (one Worker serves everything)
+The whole site now runs on a single Cloudflare Worker, `runescript` (`https://runescript.its-the-prithivi-show.workers.dev`), that serves BOTH the built frontend (static assets from `dist/`, via `wrangler.toml`'s `[assets]` block) AND the API routes in `index.js`. The owner connected it to the GitHub repo via Cloudflare Workers Builds, so **a plain `git push` to `main` is now the entire deploy** — Cloudflare runs `npm run build` and ships frontend + backend together, automatically. This replaced both Netlify (frontend) and the old manual curl-based Worker deploy. `netlify.toml` is now vestigial; `wrangler.toml` is the real, live deploy config. See CLAUDE.md for the full story, including a brief mid-session rename detour (`runescript` → `runescript-worker` → back to `runescript`).
+
+### Critical bug: every AI feature was broken after the move (`/api/claude` route collision)
+Once the Worker started serving the frontend, `/` resolved to `index.html` at the assets layer for *every* HTTP method before the fetch handler ran. The Claude API proxy was mounted at `/`, so every POST/preflight to it got a bare 405 from the assets layer — silently breaking Prospect Scanner, Pitch Generator, AI Studio, Site Builder, everything that routes through `callClaude()`. This was the root cause of "Scan failed: Failed to fetch" and the app feeling hollow. Fixed by moving the proxy to `/api/claude` (a path that can't collide with a static file) and updating the one frontend call site. Verified live end-to-end.
+
+### `STRIPE_SEEKER_PRICE_ID` binding loss (fixed + hardened)
+After the Worker rename, that one binding vanished — it was a plain `vars` binding, not a `secret_text`, and git-connected wrangler deploys reconcile vars against `wrangler.toml`, dropping anything not declared there. Restored it directly in `wrangler.toml`'s `[vars]` (it's a Price ID, not a credential — safe to commit) so it survives every future deploy. Documented the gotcha in CLAUDE.md.
+
+### Prospect Scanner: major overhaul
+- **JSON-truncation fix:** the AI-fallback business generator capped `max_tokens` too low for large result counts, cutting responses off mid-object ("Expected double-quoted property name"). Now scales with the requested count; audited and raised every other `JSON.parse(callClaude(...))` call site with the same risk.
+- **CityPicker sync bug:** the city field kept its own internal display text initialized once on mount and never re-synced when set externally, so clicking an example/saved-search filled the underlying state but not the visible field. Added the missing sync effect.
+- **Business type input:** free-text input PLUS a 237-category dropdown (hoisted as shared `BUSINESS_TYPES`) plus a "Surprise me" button that randomizes both business type AND city/country.
+- **Persistence:** results and search fields now survive navigating away and back (previously wiped on unmount), with a "Restart / Clear All" button. A scan that's still running when you navigate away no longer vanishes — it writes progress/results straight to storage independent of React state, and returning resumes the loading indicator or shows the finished results.
+- **Recent Searches** subtab (Google-history style): click a past search to regenerate it fresh in a large popup.
+- **Saved for Later watchlist:** a new page (in nav + command palette) where businesses saved from the scanner are re-checked against current Google Places data on open, flagging what changed (rating/reviews/website/phone) since they were saved.
+- **No-website filter (the tool's actual purpose):** City Search now returns ONLY businesses without a website — the whole point is finding leads that need one built. Fetches the Places max (20) and trims after filtering to keep counts healthy; shows a clear "they all already have sites" message on the edge case.
+
+### Honest data: removed ALL AI-fabricated businesses
+Owner's call — a prospecting tool showing invented companies that don't exist is actively harmful, not a helpful fallback. Removed AI fabrication from all four places it existed (main scan, business lookup, watchlist re-check, signed-out landing teaser). Each now dead-ends honestly ("add a Places key" / manual entry / unchecked) instead of inventing data. Prospect Scanner is now real-Google-Places-data-only. (Note: a shared Google Places API key is hardcoded + auto-applied for all users; it's real and HTTP-referrer-restricted — the owner updated the referrer allowlist for the new Cloudflare domain.)
+
+### AI Studio layout fix
+Brand Voice was sitting at the top of the results box, visually splitting it; moved it into the selector column so the big open box is results-only.
+
+### Deploy verification (this session)
+Every change compiled clean (0 esbuild errors), no duplicate functions, and was verified in a real browser (Playwright/Chromium) — including reproducing the exact user-reported scenarios (São Paulo fertility clinics, mid-scan navigation). Each push confirmed live via the Cloudflare deployments API + live endpoint checks (`/api/claude` responding, new bundle hash serving, secrets intact).
+
+---
+
+## Third session (2026-07-18): finish backend-dependent features, verified in a real browser throughout
 
 Goal: get every remaining feature that needs code (not owner dashboard access) fully working, so what's left after this session is a clean, ordered list of owner-only tasks. Every feature below was clicked in a real running browser (Node 22 + Vite + Playwright/Chromium), not verified by code review alone — same standard as last session, continued.
 
