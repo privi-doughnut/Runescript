@@ -3015,18 +3015,21 @@ function WatchlistPage({toast,onAddToCRM,prospects,setPage}){
     return updated;
   };
 
+  const runChecks=async(list)=>{
+    let placesKey='';
+    try{const r=await window.storage.get('rs3_places_key');if(r?.value)placesKey=r.value;}catch(e){}
+    setHasPlacesKey(!!placesKey);
+    let current=list;
+    for(const item of list){
+      current=await checkOne(item,current,placesKey);
+    }
+  };
   useEffect(()=>{
     (async()=>{
       let list=[];
       try{const r=await window.storage.get('rs3_watchlist');if(r?.value)list=JSON.parse(r.value);}catch(e){}
       setItems(list);setLoading(false);
-      let placesKey='';
-      try{const r=await window.storage.get('rs3_places_key');if(r?.value)placesKey=r.value;}catch(e){}
-      setHasPlacesKey(!!placesKey);
-      let current=list;
-      for(const item of list){
-        current=await checkOne(item,current,placesKey);
-      }
+      await runChecks(list);
     })();
   },[]);
 
@@ -3039,7 +3042,7 @@ function WatchlistPage({toast,onAddToCRM,prospects,setPage}){
 
   return(
     <div>
-      <div className="sh"><div><div className="sh-title">Saved for Later</div><div className="sh-sub">{items.length} business{items.length!==1?'es':''} saved from Prospect Scanner</div></div></div>
+      <div className="sh"><div><div className="sh-title">Saved for Later</div><div className="sh-sub">{items.length} business{items.length!==1?'es':''} saved from Prospect Scanner</div></div>{items.length>0&&<div className="sh-right"><button className="btn btn-ghost btn-sm" disabled={!!checkingId} onClick={()=>runChecks(items)}>{checkingId?'Checking…':'↻ Re-check all'}</button></div>}</div>
       {!hasPlacesKey&&items.length>0&&<div style={{fontSize:'.74rem',color:'#5a5868',padding:'10px 14px',background:'rgba(201,168,76,.04)',border:'1px solid rgba(201,168,76,.1)',marginBottom:14}}>No Google Places API key configured — saved businesses can't be checked for changes right now. Add a Places key in Settings to enable it.</div>}
       {loading?(
         <div style={{textAlign:'center',padding:40}}><Spinner lg/></div>
@@ -8726,6 +8729,14 @@ export default function RuneScript(){
   const[screen,setScreen]=useState("loading");
   const[user,setUser]=useState(null);
   const[page,setPage]=useState("dashboard");
+  // Keep-alive: once a page has been visited it stays mounted (just hidden)
+  // so its in-progress work and local state survive navigating away — a
+  // generating AI call keeps running, a half-filled form stays filled, etc.
+  // Shared data (prospects/pitches/…) lives in top-level state and updates
+  // these pages live even while hidden, so nothing goes stale; only their
+  // own transient UI state is what's being preserved.
+  const[visitedPages,setVisitedPages]=useState(()=>new Set(["dashboard"]));
+  useEffect(()=>{setVisitedPages(v=>v.has(page)?v:new Set([...v,page]));},[page]);
   const[prospects,setProspects]=useState([]);
   const[pitches,setPitches]=useState([]);
   const[proposals,setProposals]=useState([]);
@@ -9276,7 +9287,7 @@ export default function RuneScript(){
           <button onClick={()=>setShowPalette(true)} title="Command palette (Cmd+K)" style={{background:"rgba(201,168,76,.06)",border:"1px solid rgba(201,168,76,.1)",cursor:"pointer",padding:"4px 10px",fontFamily:"'JetBrains Mono',monospace",fontSize:".56rem",color:"#3a3848",letterSpacing:"1.5px",textTransform:"uppercase",display:"flex",alignItems:"center",gap:6}}><span style={{fontSize:".7rem"}}>⌘</span>K</button>
           <span className="topbar-tag">ᚱ RUNE SCRIPT</span>
         </div>
-        <div className="content">{PAGE_HELP[page]&&(<div style={{marginBottom:12}}><button onClick={()=>setShowHelp(h=>!h)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',padding:'8px 12px',background:'rgba(201,168,76,.04)',border:'1px solid rgba(201,168,76,.1)',cursor:'pointer',color:'#c9a84c',fontFamily:"'JetBrains Mono',monospace",fontSize:'.58rem',letterSpacing:'1.5px',textTransform:'uppercase'}}><span>{showHelp?'▲':'▼'}</span><span>How to use this page</span></button>{showHelp&&(<div style={{padding:'12px 14px',background:'rgba(201,168,76,.03)',border:'1px solid rgba(201,168,76,.08)',borderTop:'none'}}><div style={{fontSize:'.82rem',fontWeight:300,color:'#c9b87a',lineHeight:1.7,marginBottom:8}}><strong style={{color:'#ddd8ce'}}>What it does: </strong>{PAGE_HELP[page].what}</div><div style={{fontSize:'.82rem',fontWeight:300,color:'#9a96a2',lineHeight:1.7}}><strong style={{color:'#ddd8ce'}}>How to use it: </strong>{PAGE_HELP[page].how}</div></div>)}</div>)}{PAGES[page]}</div>
+        <div className="content">{PAGE_HELP[page]&&(<div style={{marginBottom:12}}><button onClick={()=>setShowHelp(h=>!h)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',padding:'8px 12px',background:'rgba(201,168,76,.04)',border:'1px solid rgba(201,168,76,.1)',cursor:'pointer',color:'#c9a84c',fontFamily:"'JetBrains Mono',monospace",fontSize:'.58rem',letterSpacing:'1.5px',textTransform:'uppercase'}}><span>{showHelp?'▲':'▼'}</span><span>How to use this page</span></button>{showHelp&&(<div style={{padding:'12px 14px',background:'rgba(201,168,76,.03)',border:'1px solid rgba(201,168,76,.08)',borderTop:'none'}}><div style={{fontSize:'.82rem',fontWeight:300,color:'#c9b87a',lineHeight:1.7,marginBottom:8}}><strong style={{color:'#ddd8ce'}}>What it does: </strong>{PAGE_HELP[page].what}</div><div style={{fontSize:'.82rem',fontWeight:300,color:'#9a96a2',lineHeight:1.7}}><strong style={{color:'#ddd8ce'}}>How to use it: </strong>{PAGE_HELP[page].how}</div></div>)}</div>)}{Object.keys(PAGES).filter(k=>visitedPages.has(k)).map(k=>(<div key={k} style={k===page?undefined:{display:'none'}}>{PAGES[k]}</div>))}</div>
       </div>
       <ToastDock toasts={toasts}/>
       {showShortcuts&&<ShortcutsOverlay onClose={()=>setShowShortcuts(false)}/>}
