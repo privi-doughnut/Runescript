@@ -2580,23 +2580,32 @@ function ScannerPage({onAdd,prospects,toast,setPage}){
           },
           body:JSON.stringify({
             textQuery:query,
-            maxResultCount:window.__trialLimit!==null?Math.min(Number(targetCount)||5,5):Math.min(Number(targetCount)||10,20),
+            // Always request the Places max (20). We filter out businesses
+            // that already have a website below — the whole point of the tool
+            // is to find ones that DON'T — so fetching the largest pool
+            // possible maximizes how many real no-website leads survive the
+            // filter before we trim to the requested count.
+            maxResultCount:20,
             languageCode:'en',
           }),
         });
         const data=await resp.json();
         if(data.error){throw new Error(data.error.message||'Places API error');}
         if(data.places?.length){
+          const displayCap=window.__trialLimit!==null?Math.min(Number(targetCount)||5,5):Math.min(Number(targetCount)||10,20);
           const ratingFilter=targetMinRating?Number(targetMinRating):0;
           const reviewFilter=targetMinReviews?Number(targetMinReviews):0;
-          const mapped=data.places
-            .filter(p=>(p.rating||0)>=ratingFilter&&(p.userRatingCount||0)>=reviewFilter)
+          // Businesses matching the rating/review filters, before the
+          // no-website filter — used to explain a "they all have sites" miss.
+          const matchingFilters=data.places.filter(p=>(p.rating||0)>=ratingFilter&&(p.userRatingCount||0)>=reviewFilter);
+          const mapped=matchingFilters
+            .filter(p=>!p.websiteUri)  // the core of the tool: only businesses WITHOUT a website
+            .slice(0,displayCap)
             .map(p=>{
-              const hasWebsite=!!p.websiteUri;
               const score=Math.min(98,Math.round(
                 (p.rating||4)*12+
                 Math.min((p.userRatingCount||0)/8,20)+
-                (hasWebsite?0:28)+
+                28+ // no-website bonus, always applies here now
                 (p.businessStatus==='OPERATIONAL'?8:0)
               ));
               return{
@@ -2609,8 +2618,8 @@ function ScannerPage({onAdd,prospects,toast,setPage}){
                 rating:p.rating||4.5,
                 reviews:p.userRatingCount||0,
                 services:[businessType,'Local Business',p.types?.[0]?.replace(/_/g,' ')||'Service'],
-                description:p.editorialSummary?.text||`${p.displayName?.text} — ${businessType} serving ${targetCity}. ${hasWebsite?'Has a website that may need updating.':'No website found — high opportunity lead.'}`,
-                website:p.websiteUri||'none',
+                description:p.editorialSummary?.text||`${p.displayName?.text} — ${businessType} serving ${targetCity}. No website found — high opportunity lead.`,
+                website:'none',
                 leadScore:score,
                 status:'Not Contacted',
                 notes:'',
@@ -2618,12 +2627,15 @@ function ScannerPage({onAdd,prospects,toast,setPage}){
                 lastActivity:now(),
               };
             });
-          if(mapped.length===0){toast('No results matched your filters. Try lower minimums.','info');}
+          if(mapped.length===0){
+            if(matchingFilters.length>0)toast(`All ${matchingFilters.length} matching business${matchingFilters.length!==1?'es':''} already have a website. Try a different area or business type.`,'info');
+            else toast('No results matched your filters. Try lower minimums.','info');
+          }
           else{
             setResultsFn(mapped);
             persistResultsDirect(mapped,'places');
             if(recordHistory)setResultsSource('places');
-            toast(`Found ${mapped.length} real businesses in ${targetCity} via Google Places.`,'success');
+            toast(`Found ${mapped.length} business${mapped.length!==1?'es':''} without a website in ${targetCity}.`,'success');
             if(recordHistory)logRecentSearch({city:targetCity,cat:targetCat,count:targetCount,minRating:targetMinRating,minReviews:targetMinReviews,keyword:targetKeyword,resultCount:mapped.length,source:'places'});
           }
         }else{
