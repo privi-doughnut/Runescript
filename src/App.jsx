@@ -43,6 +43,34 @@ const scoreClass = s => s>=80?'b-green':s>=60?'b-gold':'b-red';
 const scoreColor = s => s>=80?'#7ac89a':s>=60?'#c9a84c':'#e07888';
 const stars = r => '★'.repeat(Math.round(r))+'☆'.repeat(5-Math.round(r));
 
+// A LOT of local businesses are named after their owner ("Jim's Towing",
+// "Bella's Nail Salon", "Mike Smith Plumbing"). Google Places never returns
+// an owner name, and having AI guess one would be fabrication — but the
+// business NAME itself is real data we already have, and this pattern-match
+// is the same honest inference a human makes reading it. Returns a likely
+// FIRST name (or null) — always surfaced in the UI as a guess to confirm,
+// never asserted as verified fact.
+const GENERIC_BIZ_WORDS = new Set(['the','and','of','for','llc','inc','co','company','group','services','service','solutions','systems','pro','professional','best','city','local','quality','elite','premier','24','247','hour','hours','emergency']);
+function guessOwnerName(bizName){
+  if(!bizName||typeof bizName!=='string')return null;
+  const trimmed=bizName.trim();
+  // "Jim's ..." / "Bella's ..." — possessive is the strongest signal.
+  const poss=trimmed.match(/^([A-Z][a-z]{1,15})['’]s\b/);
+  if(poss&&!GENERIC_BIZ_WORDS.has(poss[1].toLowerCase()))return poss[1];
+  // "Mike Smith Plumbing" / "John Doe & Sons" — leading capitalized word that
+  // isn't a generic business word and is followed by another capitalized word.
+  const words=trimmed.split(/\s+/);
+  if(words.length>=2){
+    const first=words[0];
+    if(/^[A-Z][a-z]{1,15}$/.test(first)&&!GENERIC_BIZ_WORDS.has(first.toLowerCase())){
+      // Only trust it if the second token also looks like a name (capitalized),
+      // to avoid "Quality Roofing" → "Quality".
+      if(/^[A-Z]/.test(words[1]||'')&&!GENERIC_BIZ_WORDS.has((words[1]||'').toLowerCase().replace(/[^a-z]/g,'')))return first;
+    }
+  }
+  return null;
+}
+
 // A lead-score badge that shows a hover tooltip breaking down WHY the
 // business got its score. Same factors as the full LeadScoreExplainer modal
 // (rating × review volume × no-website × active status), just inline on hover.
@@ -77,6 +105,84 @@ function ScoreBadge({prospect, sm}) {
       )}
     </span>
   );
+}
+
+// Shows the real extra Google Places details captured during a scan (hours,
+// price, top reviews, Maps link) plus an editable owner/contact-name field.
+// The owner field is pre-seeded with the name-pattern guess (clearly labeled
+// as a guess) but is the user's to confirm/replace. onOwnerChange persists
+// the edit (updates scanner results or a CRM prospect). Renders nothing if
+// there's no extra data to show (e.g. manually-added or pre-enrichment rows).
+function ProspectDetails({p, onOwnerChange, compact}) {
+  const [open, setOpen] = useState(false);
+  const hasReviews = p.topReviews && p.topReviews.length > 0;
+  const hasMeta = p.priceLevel || p.hoursToday || p.openNow!=null || p.mapsUri;
+  const guess = p.ownerNameGuess;
+  const showOwnerField = !!onOwnerChange;
+  if (!showOwnerField && !hasReviews && !hasMeta) return null;
+  return (
+    <div style={{marginTop:8,marginBottom:8,display:'flex',flexDirection:'column',gap:6}}>
+      {showOwnerField && (
+        <div style={{display:'flex',alignItems:'center',gap:6}}>
+          <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.54rem',letterSpacing:'1px',color:'#3a3848',textTransform:'uppercase',flexShrink:0}}>Owner</span>
+          <input
+            className="inp"
+            style={{fontSize:'.74rem',padding:'4px 8px',height:'auto'}}
+            placeholder={guess?`${guess}? (likely — from name)`:'Add contact name…'}
+            value={p.ownerName||''}
+            onChange={e=>onOwnerChange(e.target.value)}
+          />
+          {guess && !p.ownerName && (
+            <button className="btn btn-ghost btn-xs" style={{flexShrink:0}} title="Use the name suggested from the business name" onClick={()=>onOwnerChange(guess)}>Use “{guess}”</button>
+          )}
+        </div>
+      )}
+      {hasMeta && (
+        <div style={{display:'flex',flexWrap:'wrap',gap:6,alignItems:'center'}}>
+          {p.openNow!=null && <span className={`badge ${p.openNow?'b-green':'b-red'}`} style={{fontSize:'.54rem'}}>{p.openNow?'Open now':'Closed now'}</span>}
+          {p.priceLevel && <span style={{fontSize:'.66rem',color:'#7a7888'}}>{p.priceLevel}</span>}
+          {p.hoursToday && <span style={{fontSize:'.64rem',color:'#5a5868'}}>{p.hoursToday}</span>}
+          {p.mapsUri && <a href={p.mapsUri} target="_blank" rel="noreferrer" style={{fontSize:'.64rem',color:'#4a7aaa',textDecoration:'none'}}>Google Maps ↗</a>}
+        </div>
+      )}
+      {hasReviews && !compact && (
+        <div>
+          <button className="btn btn-ghost btn-xs" onClick={()=>setOpen(o=>!o)}>{open?'Hide':'Show'} {p.topReviews.length} recent review{p.topReviews.length!==1?'s':''}</button>
+          {open && (
+            <div style={{marginTop:6,display:'flex',flexDirection:'column',gap:6}}>
+              {p.topReviews.map((r,i)=>(
+                <div key={i} style={{fontSize:'.72rem',color:'#7a7888',lineHeight:1.5,padding:'6px 8px',background:'rgba(201,168,76,.03)',border:'1px solid rgba(201,168,76,.06)'}}>
+                  <span style={{color:'#c9a84c'}}>{'★'.repeat(r.rating||5)}</span> {r.author&&<span style={{color:'#5a5868'}}>· {r.author}</span>}
+                  <div style={{marginTop:2}}>{r.text.length>220?r.text.slice(0,220)+'…':r.text}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+// Builds an extra-context block for AI prompts from a prospect's REAL captured
+// details, so the Pitch Generator / AI Studio / Site Builder can use them —
+// most importantly, address the owner by name when one is known. Only includes
+// facts that actually exist on the prospect; returns '' when there's nothing
+// to add, so prompts stay clean for manually-added or pre-enrichment rows.
+// The owner name is only ever passed to the AI if the USER set it (p.ownerName)
+// — the pattern-match guess (p.ownerNameGuess) is NOT fed to prompts, so the AI
+// never addresses someone by an unconfirmed name.
+function prospectContext(p){
+  if(!p)return '';
+  const bits=[];
+  if(p.ownerName)bits.push(`The owner/main contact's name is ${p.ownerName} — address them by name where it fits naturally.`);
+  if(p.priceLevel)bits.push(`Price tier: ${p.priceLevel}.`);
+  if(p.hoursToday)bits.push(`Hours today: ${p.hoursToday}.`);
+  if(p.primaryType)bits.push(`Specifically: ${p.primaryType}.`);
+  if(p.topReviews&&p.topReviews.length){
+    const quotes=p.topReviews.slice(0,2).map(r=>`"${(r.text||'').slice(0,160)}"`).join(' ');
+    if(quotes.trim())bits.push(`Recent real customer reviews to reference for authenticity: ${quotes}`);
+  }
+  return bits.length?`\n\nExtra real context about this business (use naturally, don't invent beyond it): ${bits.join(' ')}`:'';
 }
 const STATUS_COLORS = {'Not Contacted':'b-gold','Contacted':'b-blue','Read':'b-purple','Active':'b-green','Closed':'b-teal','Rejected':'b-red'};
 const PIPE_COLORS = {'Not Contacted':'#c9a84c','Contacted':'#4a7aaa','Read':'#9060b8','Active':'#5a9070','Closed':'#40a0a0','Rejected':'#c05060'};
@@ -2626,7 +2732,7 @@ function ScannerPage({onAdd,prospects,toast,setPage}){
           headers:{
             'Content-Type':'application/json',
             'X-Goog-Api-Key':placesKey,
-            'X-Goog-FieldMask':'places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.rating,places.userRatingCount,places.websiteUri,places.businessStatus,places.types,places.editorialSummary',
+            'X-Goog-FieldMask':'places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.rating,places.userRatingCount,places.websiteUri,places.businessStatus,places.types,places.editorialSummary,places.regularOpeningHours,places.priceLevel,places.reviews,places.googleMapsUri,places.primaryTypeDisplayName',
           },
           body:JSON.stringify({
             textQuery:query,
@@ -2658,21 +2764,39 @@ function ScannerPage({onAdd,prospects,toast,setPage}){
                 28+ // no-website bonus, always applies here now
                 (p.businessStatus==='OPERATIONAL'?8:0)
               ));
+              const bizName=p.displayName?.text||'Unknown Business';
+              const PRICE_MAP={PRICE_LEVEL_INEXPENSIVE:'$',PRICE_LEVEL_MODERATE:'$$',PRICE_LEVEL_EXPENSIVE:'$$$',PRICE_LEVEL_VERY_EXPENSIVE:'$$$$'};
+              const topReviews=(p.reviews||[]).slice(0,3).map(r=>({
+                text:r.text?.text||r.originalText?.text||'',
+                rating:r.rating,
+                author:r.authorAttribution?.displayName||'',
+              })).filter(r=>r.text);
+              const openNow=p.regularOpeningHours?.openNow;
+              const hoursToday=p.regularOpeningHours?.weekdayDescriptions?.[(new Date().getDay()+6)%7]||'';
               return{
                 id:uid(),
-                name:p.displayName?.text||'Unknown Business',
+                name:bizName,
                 phone:p.nationalPhoneNumber||'Not listed',
                 address:p.formattedAddress||targetCity,
                 city:targetCity,
                 category:businessType,
                 rating:p.rating||4.5,
                 reviews:p.userRatingCount||0,
-                services:[businessType,'Local Business',p.types?.[0]?.replace(/_/g,' ')||'Service'],
-                description:p.editorialSummary?.text||`${p.displayName?.text} — ${businessType} serving ${targetCity}. No website found — high opportunity lead.`,
+                services:[businessType,'Local Business',p.primaryTypeDisplayName?.text||p.types?.[0]?.replace(/_/g,' ')||'Service'],
+                description:p.editorialSummary?.text||`${bizName} — ${businessType} serving ${targetCity}. No website found — high opportunity lead.`,
                 website:'none',
                 leadScore:score,
                 status:'Not Contacted',
                 notes:'',
+                // Real extra Places details (all genuine, never invented):
+                ownerName:'',                       // manual — user fills once known
+                ownerNameGuess:guessOwnerName(bizName), // likely first name from the business name pattern, shown as a guess
+                priceLevel:PRICE_MAP[p.priceLevel]||'',
+                openNow:openNow===undefined?null:openNow,
+                hoursToday,
+                topReviews,
+                mapsUri:p.googleMapsUri||'',
+                primaryType:p.primaryTypeDisplayName?.text||'',
                 addedAt:now(),
                 lastActivity:now(),
               };
@@ -2886,11 +3010,12 @@ function ScannerPage({onAdd,prospects,toast,setPage}){
               <div className="pc-meta">{p.phone} · {p.address}</div>
               <div className="pc-rating"><span className="pc-stars">{stars(p.rating)}</span><span className="pc-rn">{p.rating} ({p.reviews} reviews)</span></div>
               <p className="pc-desc">{p.description}</p>
+              <ProspectDetails p={p} onOwnerChange={val=>setResults(rs=>rs.map(r=>r.id===p.id?{...r,ownerName:val}:r))}/>
               <div className="pc-tags">{p.services?.map(s=><span key={s} className="pc-tag">{s}</span>)}</div>
               <div className="pc-actions">
                 {added.has(p.name)
                   ?<button className="btn btn-ghost btn-sm" onClick={()=>setPage("crm")}>In CRM →</button>
-                  :<><button className="btn btn-ghost btn-sm" style={{marginRight:4}} onClick={()=>setExplainProspect(p)}>Score ↗</button><button className="btn btn-ghost btn-sm" style={{marginRight:4}} onClick={async()=>{setBiProspect(p);setBiReport('');setBiLoading(true);try{const r=await callClaude(`Write a 300-word business intelligence report for web designer pitching to: "${p.name}", ${p.category} in ${p.city}. Include: market context, why they need a website NOW, their likely customer base, competitive landscape, your best pitch angle, pricing recommendation, and the one thing that will make or break the deal. Be specific and tactical.`,800);setBiReport(r);}catch(e){toast('BI Report failed.','error');}setBiLoading(false);}}>BI Report</button><button className="btn btn-gold btn-sm" onClick={()=>addToCRM(p)}>+ Add to CRM</button></>
+                  :<><button className="btn btn-ghost btn-sm" style={{marginRight:4}} onClick={()=>setExplainProspect(p)}>Score ↗</button><button className="btn btn-ghost btn-sm" style={{marginRight:4}} onClick={async()=>{setBiProspect(p);setBiReport('');setBiLoading(true);try{const r=await callClaude(`Write a 300-word business intelligence report for web designer pitching to: "${p.name}", ${p.category} in ${p.city}.${prospectContext(p)} Include: market context, why they need a website NOW, their likely customer base, competitive landscape, your best pitch angle, pricing recommendation, and the one thing that will make or break the deal. Be specific and tactical.`,800);setBiReport(r);}catch(e){toast('BI Report failed.','error');}setBiLoading(false);}}>BI Report</button><button className="btn btn-gold btn-sm" onClick={()=>addToCRM(p)}>+ Add to CRM</button></>
                 }
                 <button className="btn btn-ghost btn-sm" onClick={()=>setPage("pitch")}>Pitch →</button>
                 <button className="btn btn-ghost btn-sm" disabled={watchedNames.has(p.name)} onClick={()=>saveForLater(p)}>{watchedNames.has(p.name)?'✓ Saved':'💾 Save for Later'}</button>
@@ -3226,6 +3351,15 @@ function CRMPage({prospects,updateProspect,removeProspect,setPage,toast}){
             <div className="dr-head"><div><div style={{fontFamily:"'Cinzel',serif",fontSize:"1rem",fontWeight:700,color:"#ddd8ce",marginBottom:6}}>{selected.name}</div><Badge status={selected.status}/></div><button className="dr-close" onClick={()=>setSelected(null)}>✕</button></div>
             {[{l:"Phone",v:selected.phone},{l:"Address",v:selected.address},{l:"City",v:selected.city},{l:"Category",v:selected.category},{l:"Rating",v:`${selected.rating}★ (${selected.reviews} reviews)`},{l:"Lead Score",v:selected.leadScore}].map(({l,v})=><div key={l} className="dr-field"><div className="dr-label">{l}</div><div className="dr-val">{v}</div></div>)}
             <div className="dr-field"><div className="dr-label">Services</div><div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:5}}>{selected.services?.map(s=><span key={s} style={{fontFamily:"'JetBrains Mono',monospace",fontSize:".56rem",letterSpacing:"1px",textTransform:"uppercase",padding:"3px 8px",border:"1px solid rgba(201,168,76,.08)",color:"#2e2d3c"}}>{s}</span>)}</div></div>
+            <div className="dr-field">
+              <div className="dr-label">Owner / Main Contact</div>
+              <div style={{display:'flex',gap:6,alignItems:'center',marginTop:5}}>
+                <input className="inp" style={{fontSize:'.78rem'}} placeholder={selected.ownerNameGuess?`${selected.ownerNameGuess}? (likely — from name)`:'Add contact name…'} value={selected.ownerName||''} onChange={e=>{updateProspect(selected.id,{ownerName:e.target.value});setSelected(prev=>({...prev,ownerName:e.target.value}));}}/>
+                {selected.ownerNameGuess&&!selected.ownerName&&<button className="btn btn-ghost btn-xs" style={{flexShrink:0}} onClick={()=>{updateProspect(selected.id,{ownerName:selected.ownerNameGuess});setSelected(prev=>({...prev,ownerName:selected.ownerNameGuess}));}}>Use “{selected.ownerNameGuess}”</button>}
+              </div>
+              <div style={{fontSize:'.62rem',color:'#3a3848',marginTop:4,lineHeight:1.5}}>Used by the Pitch Generator & AI tools to address them by name. Guesses come from the business name — confirm before relying on them.</div>
+            </div>
+            {(selected.topReviews?.length>0||selected.hoursToday||selected.priceLevel)&&<ProspectDetails p={selected}/>}
             <div className="divider"/>
             <div className="dr-label" style={{marginBottom:8}}>Update Status</div>
             <div className="dr-status-grid">{"Not Contacted,Contacted,Read,Active,Closed,Rejected".split(",").map(s=><button key={s} className={`dr-sb${selected.status===s?" on":""}`} onClick={()=>changeStatus(s)}>{s}</button>)}</div>
@@ -3312,7 +3446,7 @@ function PitchPage({prospects,pitches,addPitch,updatePitch,toast}){
     if(!target?.name){toast('Select a prospect first.','error');return;}
     setLoading(true);setLoadingB(true);setResult(null);setResultB(null);
     try{
-      const makePrompt=(t)=>`Generate a web design pitch package in a "${t}" tone for "${target.name}", a ${target.category||'local business'} in ${target.city||'their city'}. Return ONLY valid JSON: {"sms":"","call":"","email":"","followup":""}`;
+      const makePrompt=(t)=>`Generate a web design pitch package in a "${t}" tone for "${target.name}", a ${target.category||'local business'} in ${target.city||'their city'}.${prospectContext(target)} Return ONLY valid JSON: {"sms":"","call":"","email":"","followup":""}`;
       const[rawA,rawB]=await Promise.all([callClaude(makePrompt(activeTone),1800),callClaude(makePrompt(toneB),1800)]);
       const parsedA=JSON.parse(rawA.replace(/```json|```/g,'').trim());
       const parsedB=JSON.parse(rawB.replace(/```json|```/g,'').trim());
@@ -3327,7 +3461,7 @@ function PitchPage({prospects,pitches,addPitch,updatePitch,toast}){
     if(!target?.name){toast("Select a prospect or enter details.","error");return;}
     setLoading(true);setResult(null);
     try{
-      const prompt=`Generate a pitch package for a web designer pitching to "${target.name}", a ${target.category} business in ${target.city} with ${target.rating} stars and ${target.reviews} reviews. Tone: ${activeTone}. Return ONLY valid JSON: {"sms":"2-3 sentence SMS pitch","call":"phone call script 150-200 words","email":"Subject: ...\\n\\n[email body]","followup":"2-sentence follow-up SMS"}`;
+      const prompt=`Generate a pitch package for a web designer pitching to "${target.name}", a ${target.category} business in ${target.city} with ${target.rating} stars and ${target.reviews} reviews. Tone: ${activeTone}.${prospectContext(target)} Return ONLY valid JSON: {"sms":"2-3 sentence SMS pitch","call":"phone call script 150-200 words","email":"Subject: ...\\n\\n[email body]","followup":"2-sentence follow-up SMS"}`;
       const raw=await callClaude(prompt,1800);
       const parsed=JSON.parse(raw.replace(/```json|```/g,"").trim());
       setResult(parsed);addPitch({id:uid(),prospectId:selId,prospectName:target.name,tone,...parsed,generatedAt:now()});setTab("sms");toast("Pitch generated.","success");
@@ -4824,7 +4958,7 @@ function AIStudioPage({prospects,toast}){
   const generate=async()=>{
     setLoading(true);setOutput("");
     try{
-      const biz=c?`${c.name}, a ${c.category} business in ${c.city} with ${c.rating} stars and ${c.reviews} reviews.`:customInput;
+      const biz=c?`${c.name}, a ${c.category} business in ${c.city} with ${c.rating} stars and ${c.reviews} reviews.${prospectContext(c)}`:customInput;
       if(!biz){toast("Select a client or enter business details.","error");setLoading(false);return;}
       let prompt="";
       if(tool==="social")prompt=`Generate a week of ${opts.platform} content for ${biz} Tone: ${opts.tone}. 7 posts Mon-Sun. Each: caption (2-3 sentences), 3-5 hashtags, best time to post.`;
@@ -8951,7 +9085,17 @@ export default function RuneScript(){
         sb.from('proposals').select('*').eq('user_id',userId),
         sb.from('invoices').select('*').eq('user_id',userId),
       ]);
-      if(pros.data?.length)setProspects(pros.data.map(p=>({...p,leadScore:p.lead_score,addedAt:p.added_at,lastActivity:p.last_activity})));
+      if(pros.data?.length)setProspects(prev=>{
+        // Merge: Supabase only stores the core columns, but the local copy may
+        // carry richer scan details (ownerName, topReviews, hours, etc.) that
+        // aren't in the DB schema. Keep those local-only fields by merging the
+        // matching local prospect over the DB row, rather than replacing wholesale.
+        const localById=Object.fromEntries((prev||[]).map(x=>[x.id,x]));
+        return pros.data.map(p=>({...(localById[p.id]||{}),...p,leadScore:p.lead_score,addedAt:p.added_at,lastActivity:p.last_activity,
+          ownerName:localById[p.id]?.ownerName??p.owner_name??'',
+          ownerNameGuess:localById[p.id]?.ownerNameGuess,
+          topReviews:localById[p.id]?.topReviews,priceLevel:localById[p.id]?.priceLevel,hoursToday:localById[p.id]?.hoursToday,openNow:localById[p.id]?.openNow,mapsUri:localById[p.id]?.mapsUri,primaryType:localById[p.id]?.primaryType}));
+      });
       if(pits.data?.length)setPitches(pits.data);
       if(props.data?.length)setProposals(props.data);
       if(invs.data?.length)setInvoices(invs.data);
