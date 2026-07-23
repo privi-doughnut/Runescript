@@ -1,10 +1,16 @@
 // Rune Script — Cloudflare Worker
 // Handles: Claude API proxy + Stripe Checkout for trial
 
-const ALLOWED_ORIGINS = ['https://runescript.netlify.app', 'https://runescript.app'];
+// The live site now runs on the Cloudflare Worker's own domain (frontend +
+// API served from the same origin), so most requests are same-origin and
+// don't need CORS at all — but the fallback default must be the live origin,
+// not the old Netlify one, or any genuinely cross-origin call (or a strict
+// preflight) gets an allow-origin that doesn't match and fails.
+const LIVE_ORIGIN = 'https://runescript.its-the-prithivi-show.workers.dev';
+const ALLOWED_ORIGINS = [LIVE_ORIGIN, 'https://runescript.netlify.app', 'https://runescript.app'];
 
 function corsHeaders(origin) {
-  const allowed = ALLOWED_ORIGINS.includes(origin) || origin?.endsWith('.netlify.app') ? origin : 'https://runescript.netlify.app';
+  const allowed = ALLOWED_ORIGINS.includes(origin) || origin?.endsWith('.netlify.app') || origin?.endsWith('.workers.dev') ? origin : LIVE_ORIGIN;
   return {
     'Access-Control-Allow-Origin': allowed,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',

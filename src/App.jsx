@@ -42,6 +42,42 @@ const now = () => new Date().toLocaleDateString('en-US',{month:'short',day:'nume
 const scoreClass = s => s>=80?'b-green':s>=60?'b-gold':'b-red';
 const scoreColor = s => s>=80?'#7ac89a':s>=60?'#c9a84c':'#e07888';
 const stars = r => '★'.repeat(Math.round(r))+'☆'.repeat(5-Math.round(r));
+
+// A lead-score badge that shows a hover tooltip breaking down WHY the
+// business got its score. Same factors as the full LeadScoreExplainer modal
+// (rating × review volume × no-website × active status), just inline on hover.
+function ScoreBadge({prospect, sm}) {
+  const [hover, setHover] = useState(false);
+  const s = prospect;
+  const ratingPts = Math.round((s.rating||4) * 12);
+  const reviewPts = Math.min(Math.round((s.reviews||0)/8), 20);
+  const websitePts = (!s.website || s.website==='none') ? 28 : 0;
+  const statusPts = 8;
+  const total = s.leadScore!=null ? s.leadScore : Math.min(98, ratingPts+reviewPts+websitePts+statusPts);
+  const rows = [
+    {l:'Star rating', p:ratingPts, n:`${s.rating||4}★ × 12`},
+    {l:'Review volume', p:reviewPts, n:`${s.reviews||0} reviews`},
+    {l:'No website', p:websitePts, n:websitePts>0?'high opportunity':'has a site'},
+    {l:'Active business', p:statusPts, n:'operational'},
+  ];
+  return (
+    <span style={{position:'relative',display:'inline-block',flexShrink:0}} onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}>
+      <span className={`badge ${scoreClass(total)}`} style={{color:scoreColor(total),cursor:'help',...(sm?{fontSize:'.52rem',padding:'1px 5px'}:{})}}>Score {total}</span>
+      {hover && (
+        <div style={{position:'absolute',bottom:'calc(100% + 8px)',right:0,zIndex:60,width:230,background:'#0d0d1a',border:'1px solid rgba(201,168,76,.25)',padding:'10px 12px',boxShadow:'0 8px 24px rgba(0,0,0,.5)',pointerEvents:'none',textAlign:'left'}}>
+          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.54rem',letterSpacing:'1px',color:'#c9a84c',textTransform:'uppercase',marginBottom:6}}>Why score {total}?</div>
+          {rows.map((it,i)=>(
+            <div key={i} style={{display:'flex',justifyContent:'space-between',gap:8,fontSize:'.64rem',color:'#9a96a2',marginBottom:2}}>
+              <span>{it.l} <span style={{color:'#3a3848'}}>({it.n})</span></span>
+              <span style={{color:'#c9a84c',fontWeight:700,flexShrink:0}}>+{it.p}</span>
+            </div>
+          ))}
+          <div style={{marginTop:5,paddingTop:5,borderTop:'1px solid rgba(201,168,76,.1)',fontSize:'.6rem',color:'#5a5868',lineHeight:1.5}}>Higher = hotter lead. No website is the biggest signal — that's your opening.</div>
+        </div>
+      )}
+    </span>
+  );
+}
 const STATUS_COLORS = {'Not Contacted':'b-gold','Contacted':'b-blue','Read':'b-purple','Active':'b-green','Closed':'b-teal','Rejected':'b-red'};
 const PIPE_COLORS = {'Not Contacted':'#c9a84c','Contacted':'#4a7aaa','Read':'#9060b8','Active':'#5a9070','Closed':'#40a0a0','Rejected':'#c05060'};
 
@@ -1911,11 +1947,25 @@ function AuthScreen({onAuth,onBack}) {
       if(mode==='signup'){
         const{data,error:err}=await sb.auth.signUp({email,password,options:{data:{name:name||email.split('@')[0]}}});
         if(err)throw err;
-        if(data.user)onAuth({name:name||email.split('@')[0],email,id:data.user.id},true);
+        if(data.user){
+          // Affiliate attribution: if this signup came through someone's
+          // ?ref= link, look up that affiliate by handle and record a real
+          // referral row. Best-effort — never blocks signup.
+          try{
+            const refHandle=new URLSearchParams(window.location.search).get('ref');
+            if(refHandle){
+              const{data:aff}=await sb.from('affiliates').select('user_id').eq('handle',refHandle.toLowerCase()).maybeSingle();
+              if(aff?.user_id&&aff.user_id!==data.user.id){
+                await sb.from('referrals').insert({referrer_id:aff.user_id,referred_user_id:data.user.id,referred_handle:refHandle.toLowerCase()});
+              }
+            }
+          }catch(e){}
+          onAuth({name:name||email.split('@')[0],email,id:data.user.id},true);
+        }
       }else{
         const{data,error:err}=await sb.auth.signInWithPassword({email,password});
         if(err)throw err;
-        const{data:profile}=await sb.from('profiles').select('*').eq('id',data.user.id).single();
+        const{data:profile}=await sb.from('profiles').select('*').eq('id',data.user.id).maybeSingle();
         onAuth({name:profile?.name||email.split('@')[0],email,id:data.user.id});
       }
     }catch(e){setError(e.message||'Authentication failed.');}
@@ -2832,7 +2882,7 @@ function ScannerPage({onAdd,prospects,toast,setPage}){
         <div className="pros-grid">
           {results.map(p=>(
             <div key={p.id} className="pc">
-              <div className="pc-head"><div className="pc-name">{p.name}</div><span className={`badge ${scoreClass(p.leadScore)}`} style={{color:scoreColor(p.leadScore),flexShrink:0}}>Score {p.leadScore}</span></div>
+              <div className="pc-head"><div className="pc-name">{p.name}</div><ScoreBadge prospect={p}/></div>
               <div className="pc-meta">{p.phone} · {p.address}</div>
               <div className="pc-rating"><span className="pc-stars">{stars(p.rating)}</span><span className="pc-rn">{p.rating} ({p.reviews} reviews)</span></div>
               <p className="pc-desc">{p.description}</p>
@@ -2892,7 +2942,7 @@ function ScannerPage({onAdd,prospects,toast,setPage}){
                 <div className="pros-grid">
                   {historyResults.map(p=>(
                     <div key={p.id} className="pc">
-                      <div className="pc-head"><div className="pc-name">{p.name}</div><span className={`badge ${scoreClass(p.leadScore)}`} style={{color:scoreColor(p.leadScore),flexShrink:0}}>Score {p.leadScore}</span></div>
+                      <div className="pc-head"><div className="pc-name">{p.name}</div><ScoreBadge prospect={p}/></div>
                       <div className="pc-meta">{p.phone} · {p.address}</div>
                       <div className="pc-rating"><span className="pc-stars">{stars(p.rating)}</span><span className="pc-rn">{p.rating} ({p.reviews} reviews)</span></div>
                       <p className="pc-desc">{p.description}</p>
@@ -6783,7 +6833,7 @@ function RoadmapPage({user, toast}) {
 function AffiliatePage({user,toast}) {
   const [handle,setHandle]=useState('');
   const [saved,setSaved]=useState(false);
-  const [stats,setStats]=useState({clicks:0,signups:0,conversions:0,earned:0});
+  const [stats,setStats]=useState({signups:0,conversions:0,earned:0});
   const [payoutEmail,setPayoutEmail]=useState('');
   const [payout,setPayout]=useState('paypal');
   const [referrals,setReferrals]=useState([]);
@@ -6793,14 +6843,15 @@ function AffiliatePage({user,toast}) {
     if(!user?.id)return;
     // Load affiliate data from Supabase
     Promise.all([
-      sb.from('affiliates').select('*').eq('user_id',user.id).single(),
+      sb.from('affiliates').select('*').eq('user_id',user.id).maybeSingle(),
       sb.from('referrals').select('*').eq('referrer_id',user.id).order('created_at',{ascending:false}).limit(20),
     ]).then(([{data:aff},{data:refs}])=>{
       if(aff){setHandle(aff.handle||'');setPayoutEmail(aff.payout_email||'');setPayout(aff.payout_method||'paypal');}
       if(refs){
         setReferrals(refs);
+        // All real numbers derived from actual referral rows — no estimates
+        // or random padding. Zero until real referrals come in.
         setStats({
-          clicks:refs.length*3+Math.floor(Math.random()*10), // estimated
           signups:refs.length,
           conversions:refs.filter(r=>r.converted).length,
           earned:refs.filter(r=>r.converted).length*29.70, // 30% of $99
@@ -6825,7 +6876,7 @@ function AffiliatePage({user,toast}) {
     }catch(e){toast('Save failed. Try again.','error');}
   };
 
-  const refLink=`https://runescript.app?ref=${handle||'your-handle'}`;
+  const refLink=`${typeof window!=='undefined'?window.location.origin:'https://runescript.its-the-prithivi-show.workers.dev'}/?ref=${handle||'your-handle'}`;
   const TIER_COMMISSION={standard:'30%',pro:'35%',partner:'40%'};
 
   return(
@@ -7994,6 +8045,20 @@ const ONBOARDING_SLIDES = [
     color:'#4a7aaa',
   },
   {
+    rune:'🔑',
+    title:'One-Time Setup',
+    sub:'Do this before your first scan.',
+    body:"The Prospect Scanner needs an API key to pull real business data. Head to Settings and click \"Save Keys\" once — that's it. Until you do, scans won't return results. It only takes a few seconds and you'll never have to touch it again.",
+    color:'#e0a848',
+  },
+  {
+    rune:'ᚨ',
+    title:'How Lead Scores Work',
+    sub:'Every prospect gets a 0–98 score.',
+    body:"The score ranks how good a lead each business is, from four signals: star rating (up to +48), number of reviews (up to +20), whether they're missing a website (+28 — the biggest opportunity signal), and whether they're an active/operational business (+8). Higher = hotter lead. Hover over any score to see exactly how it broke down for that business.",
+    color:'#7ac89a',
+  },
+  {
     rune:'📋',
     title:'CRM & Pipeline',
     sub:'Your entire prospect pipeline in one place.',
@@ -8813,7 +8878,7 @@ export default function RuneScript(){
     // Handle public proposal
     const proposalId = params.get('proposal');
     if (proposalId) {
-      sb.from('proposals').select('*').eq('id', proposalId).single()
+      sb.from('proposals').select('*').eq('id', proposalId).maybeSingle()
         .then(({data}) => {
           if (data) setPublicProposal(data);
         }).catch(() => {});
@@ -8944,12 +9009,12 @@ export default function RuneScript(){
     // (e.g. an unknown column) — checking only `data` via try/catch silently
     // swallows failures as null data instead of triggering the fallback.
     try{
-      const{data,error}=await sb.from('profiles').select('plan,trial_ends_at,comp_plan').eq('id',userId).single();
+      const{data,error}=await sb.from('profiles').select('plan,trial_ends_at,comp_plan').eq('id',userId).maybeSingle();
       if(error)throw error;
       return await resolvePlan(data,userId);
     }catch(e){
       try{
-        const{data,error}=await sb.from('profiles').select('plan,trial_ends_at').eq('id',userId).single();
+        const{data,error}=await sb.from('profiles').select('plan,trial_ends_at').eq('id',userId).maybeSingle();
         if(error)throw error;
         return await resolvePlan(data,userId);
       }catch(e2){return{plan:'apprentice'};}

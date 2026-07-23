@@ -194,6 +194,51 @@ create trigger trg_increment_template_sales
   after insert on template_sales
   for each row execute function increment_template_sales();
 
+-- ── 6. Affiliate program ────────────────────────────────────────────────────
+-- affiliates: a user's referral handle + payout details.
+-- referrals: one row per person who signed up via someone's ?ref= link.
+create table if not exists affiliates (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  handle text unique not null,
+  payout_email text,
+  payout_method text default 'paypal',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists referrals (
+  id uuid primary key default gen_random_uuid(),
+  referrer_id uuid references auth.users(id) on delete cascade not null,  -- the affiliate who gets credit
+  referred_user_id uuid references auth.users(id) on delete set null,     -- who signed up (may be null if not captured)
+  referred_handle text,          -- the ?ref= handle used, denormalized
+  converted boolean not null default false,  -- flipped true when the referred user pays
+  created_at timestamptz not null default now()
+);
+
+create index if not exists referrals_referrer_idx on referrals (referrer_id);
+
+alter table affiliates enable row level security;
+alter table referrals enable row level security;
+
+drop policy if exists "users manage own affiliate row" on affiliates;
+create policy "users manage own affiliate row" on affiliates
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Anyone signed in can look up an affiliate by handle (needed to attribute a
+-- signup to the right referrer) — but only non-sensitive columns matter here.
+drop policy if exists "anyone can look up affiliate handles" on affiliates;
+create policy "anyone can look up affiliate handles" on affiliates
+  for select using (true);
+
+drop policy if exists "affiliates view own referrals" on referrals;
+create policy "affiliates view own referrals" on referrals
+  for select using (auth.uid() = referrer_id);
+
+-- A newly-signed-up user records their own referral row (referred_user_id =
+-- themselves) attributing it to whoever referred them.
+drop policy if exists "referred user records own referral" on referrals;
+create policy "referred user records own referral" on referrals
+  for insert with check (auth.uid() = referred_user_id);
+
 -- ============================================================================
 -- Done. After running this, tell Claude Code (or just refresh the app) —
 -- no restart needed, PostgREST picks up new tables/columns automatically.
