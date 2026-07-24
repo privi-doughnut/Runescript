@@ -1,6 +1,77 @@
 # Rune Script — Progress Report
 
-_Last updated: 2026-07-22 (fourth session — Cloudflare migration, AI-routing fix, Prospect Scanner overhaul, watchlist, honest-data enforcement)_
+_Last updated: 2026-07-24 (fifth session — roadmap audit, SQL activated, honesty pass on stats + pricing)_
+
+---
+
+## Feature backlog captured from the pricing tiers (2026-07-24)
+
+The pricing tiers historically listed ~200 features, most aspirational/not-built.
+Before trimming the pricing page down to what's actually live, capturing the
+full set here so nothing is forgotten — grouped by buildability. This is the
+product roadmap backlog.
+
+### Already built (were listed as if pending — they exist today)
+AI case study generator, press release generator, AI pricing suggester, brand
+voice analyzer, time tracking, referral tracking, revenue-sharing on template
+sales (creator earnings), invoicing, contract generator, client intake form
+generator, proposal generator, CSV export, Google Business Profile optimizer,
+ad copy generator, SEO content/blog generator, review-response drafts,
+Marketplace buy/sell + earnings, e-commerce Shop section (products/cart/
+checkout), appointment/booking widget, section editor (drag-drop reorder +
+inline text/image edit), GitHub deploy, AI Call Coach, competitor/site
+analyzer, client portal (view), email sequences, creator program, affiliate
+program.
+
+### Cleanly buildable now — no external account needed
+- Lead predictor (AI scores the CRM pipeline on a schedule)
+- Site performance dashboard + Core Web Vitals (Google PageSpeed Insights API — free)
+- Automated monthly site-health reports (cron + PageSpeed + Resend email)
+- Local SEO optimization tool (AI over the business's data)
+- Review monitoring (Google Places reviews we already fetch) + AI response drafts
+- Live chat widget (embeddable on client sites, same pattern as the booking widget)
+- AI chatbot per site / 24-7 conversation AI for client sites (embeddable widget + Claude proxy)
+- Client-facing code export (we already generate the HTML — add a download)
+- Automated client reporting / multi-client financial reporting (aggregate existing data)
+- Client health score — AI predicts churn (AI over CRM status/activity)
+- Client persona builder, survey builder, digital forms/waivers (generators)
+- AEO / schema markup generator, ADA compliance checker, speed optimizer (AI passes)
+- Phone/email finder & social presence check (best-effort; honest about coverage — NOT LinkedIn scraping)
+- Meeting scheduler, project management + milestones (local data features)
+- Loyalty/rewards, gift cards, coupons on client sites (site sections/widgets)
+- Restaurant/fitness/hotel/event/course industry tool packs (site templates + sections)
+- Staging environment, version history, automatic backups (localStorage/Supabase snapshots)
+
+### Buildable but need an owner account / paid service
+- Voicemail drop, SMS outreach automation → Twilio (+ a ringless-voicemail vendor)
+- Heatmap integration → Microsoft Clarity or Hotjar embed (owner signs up)
+- Subscription billing on client sites, multi-currency e-commerce, e-signature +
+  instant payment, abandoned-cart recovery, POS, subscription boxes → Stripe (parked
+  until Stripe is set up)
+- Cold email warm-up, full SMS+email outreach automation → email/SMS infra + warmup service
+- AI model selector (GPT-4o, Gemini), bring-your-own-API-key → those providers' keys
+- Directory auto-submission, multichannel selling (Amazon/eBay/FB/IG), dropshipping,
+  print-on-demand → each is a third-party integration/marketplace API
+- AI video maker / AI pitch video → a video-generation API
+- Uptime monitoring, SSL management → an uptime service / cert automation
+- Google Ads / Facebook+Instagram ads generators can be built (copy), but *placing*
+  ads needs those ad platforms' APIs + the owner's ad accounts
+
+### Large — need a dedicated build (not a bolt-on)
+- Real-time collaboration / simultaneous editors → Supabase Realtime + conflict handling
+- Teams: multiple seats, roles & permissions, sub-accounts → multi-user/org data model + auth work
+- Reseller program / white-label (own domain, rebranded editor & reports & mobile builder)
+  → theming layer + tenant model + custom-domain routing
+- Full API access + custom integrations (Enterprise) → a public API surface
+- Database builder (no-SQL) / user-auth builder for client sites → substantial builders
+- Wix-style free-form drag-drop page editor (beyond today's section editor)
+- Mobile app builder (Capacitor scaffold exists on a branch; needs Xcode/Android Studio to finish)
+- Agentic autonomous build mode
+
+### Recommend dropping / rewording (not honestly buildable)
+- "LinkedIn owner scraping" / "LinkedIn-informed pitches": LinkedIn actively blocks
+  scraping and it violates their ToS. Reword to a general "owner/contact research"
+  (best-effort public data) or drop.
 
 ---
 

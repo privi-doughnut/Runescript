@@ -1719,7 +1719,7 @@ function LandingPage({onSignIn,onGetStarted,user,onDashboard}) {
       <div className="land-live-bar">
         <div className="land-live-inner">
           <div className="land-live-dot"/>
-          {[{n:"3,412",l:"Prospects Found"},  {n:"1,847",l:"Sites Built"},{n:"512",l:"Clients Closed"},{n:"$847K",l:"Revenue Tracked"},{n:"218",l:"Agencies Running"}].map((s,i)=>(
+          {[{n:"470+",l:"Site Templates"},{n:"41",l:"Industries"},{n:"17",l:"AI Tools"},{n:"12",l:"Pitch Tones"},{n:"Real",l:"Google Data"}].map((s,i)=>(
             <div key={i} className="land-live-stat">
               <span className="land-live-n">{s.n}</span>
               <span className="land-live-label">{s.l}</span>
