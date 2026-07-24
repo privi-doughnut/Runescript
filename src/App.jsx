@@ -6291,8 +6291,8 @@ function RulesPage() {
       ))}
       <div className="card" style={{textAlign:'center',padding:24}}>
         <div style={{fontFamily:"'Cinzel',serif",fontSize:'.88rem',fontWeight:700,color:'#ddd8ce',marginBottom:6}}>Questions about these terms?</div>
-        <p style={{fontSize:'.8rem',fontWeight:300,color:'#5a5868',marginBottom:14}}>Email us at legal@runescript.app and we'll respond within 2 business days.</p>
-        <button className="btn btn-ghost btn-sm">Contact Legal Team →</button>
+        <p style={{fontSize:'.8rem',fontWeight:300,color:'#5a5868',marginBottom:14}}>Email us at {OWNER_EMAIL} and we'll respond within 2 business days.</p>
+        <button className="btn btn-ghost btn-sm" onClick={()=>{window.location.href=`mailto:${OWNER_EMAIL}?subject=${encodeURIComponent('Question about Rune Script terms')}`;}}>Contact Legal Team →</button>
       </div>
     </div>
   );

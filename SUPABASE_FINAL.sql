@@ -214,6 +214,21 @@ create table if not exists referrals (
   created_at timestamptz not null default now()
 );
 
+-- Resilience: `create table if not exists` is a no-op if the table already
+-- exists with an OLDER schema, so the columns below might be missing on a
+-- pre-existing referrals/affiliates table (this is what caused the
+-- "column referred_user_id does not exist" error). Add them explicitly so
+-- the RLS policies that reference them can be created either way.
+alter table referrals add column if not exists referrer_id uuid references auth.users(id) on delete cascade;
+alter table referrals add column if not exists referred_user_id uuid references auth.users(id) on delete set null;
+alter table referrals add column if not exists referred_handle text;
+alter table referrals add column if not exists converted boolean not null default false;
+alter table referrals add column if not exists created_at timestamptz not null default now();
+alter table affiliates add column if not exists handle text;
+alter table affiliates add column if not exists payout_email text;
+alter table affiliates add column if not exists payout_method text default 'paypal';
+alter table affiliates add column if not exists created_at timestamptz not null default now();
+
 create index if not exists referrals_referrer_idx on referrals (referrer_id);
 
 alter table affiliates enable row level security;
