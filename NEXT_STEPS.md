@@ -26,19 +26,23 @@ All account/dashboard actions — worth batching. Owner has said they'll start t
 
 Ordered by the owner's chosen build sequence: **#3 first, then #1, then #2.**
 
-### 1. Stripe Connect payouts
-Right now creator earnings are tracked but payouts are manual (owner pays people by hand + marks `payout_status = 'manual_paid'` in the DB). This is the biggest genuine feature gap. Real onboarding/KYC/transfer work — a meaty but high-value build. **(Build second.)**
+### 1. Stripe Connect payouts — ⏸ PARKED
+Creator earnings are tracked but payouts are manual (owner pays people by hand + marks `payout_status = 'manual_paid'` in the DB). Automating this needs Stripe Connect. **Parked until the owner finishes setting up Stripe** — nothing Stripe-related can be built or tested until then. This is the biggest remaining feature gap once unblocked.
 
-### 2. Roadmap / changelog page audit
-The app already has a Roadmap page. Worth going through it and making sure what it promises matches what actually works now, since a lot has changed. **(Build last.)**
+### 2. Roadmap / changelog page audit — ✅ DONE (2026-07-24)
+Corrected the in-app Roadmap so it matches reality (removed the stale "AI fallback" scanner claim, moved shipped features — visual editor, e-commerce, watchlist — out of Coming Soon, added a "Backend-Ready — Activating" phase). Refreshed the Changelog (was frozen at Jun 13; added v1.7–v1.9). Added the missing `feature_requests` table so the community board works.
 
-### 3. Keep hardening what exists
-Every deep dive into a feature has surfaced real bugs (the `/api/claude` collision, the fabrication paths, the CityPicker sync, the missing no-website filter). A systematic click-through of the whole website — Agency OS, Pitch Generator, Site Builder, CRM, all of it — to find and fix the rest proactively before real users hit them. **(Build first — in progress.)**
+### 3. Keep hardening what exists — ◑ SUBSTANTIALLY DONE (ongoing)
+Every deep dive surfaces real bugs. Done so far: full 27-page sweep (no crashes/blank screens), fixed all `.single()` 406s, removed affiliate stat fabrication + built the affiliate backend, fixed the stale CORS allowlist, added keep-alive + verified no DOM-collision risk, money-path pages (CRM/Agency OS) verified clean. Remaining: deeper interactive testing of Site Builder edge cases and the AI Studio tools as time allows.
 
 ---
 
 ## Build status
 
-- **#3 (hardening):** in progress
-- **#1 (Stripe Connect):** queued
-- **#2 (Roadmap audit):** queued
+- **#2 (Roadmap audit):** ✅ done
+- **#3 (hardening):** ◑ substantially done, ongoing
+- **#1 (Stripe Connect):** ⏸ parked — blocked on owner's Stripe setup
+
+## When Stripe is ready (owner)
+
+Ping me once Stripe is set up and Connect is enabled. Then #1 unblocks: I'll build creator payout onboarding (Express accounts recommended — Stripe hosts the KYC/dashboard) and the transfer flow, and document the Stripe-dashboard steps.
