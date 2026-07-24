@@ -6058,6 +6058,9 @@ function NotificationCenter({prospects, pitches}) {
 
 // ── CHANGELOG DATA ─────────────────────────────────────────────────────────
 const CHANGELOG = [
+  {date:'Jul 24, 2026',version:'v1.9',tag:'b-green',tagLabel:'New',title:'Business Details + Owner Names + Always-On Tabs',desc:'Scans now pull far more real detail on each business, and every tab keeps working even after you click away.',items:['Real opening hours, price level, and actual customer reviews on each prospect','Suggested owner/contact name from the business name — confirm it, then pitches address them by name','Every page stays live in the background — an AI generation keeps running while you work elsewhere','Hover any lead score to see exactly why it scored that way','Onboarding now covers first-time setup and how scoring works']},
+  {date:'Jul 22, 2026',version:'v1.8',tag:'b-gold',tagLabel:'Improved',title:'Prospect Scanner Overhaul',desc:'Rebuilt the scanner around real data and the leads that actually matter.',items:['Only shows businesses WITHOUT a website — the leads worth pitching','Real Google Places data only — no invented businesses, ever','237 business types with a searchable dropdown + "Surprise me" randomizer','Recent Searches history and a Saved-for-Later watchlist that flags changes','Results and in-progress scans survive navigating away and back']},
+  {date:'Jul 22, 2026',version:'v1.7',tag:'b-blue',tagLabel:'Platform',title:'Faster, More Reliable Hosting',desc:'Moved the whole platform to Cloudflare — frontend and backend now deploy together, instantly.',items:['Every AI feature (Scanner, Pitch, Studio, Builder) rock-solid again','One-push deploys — updates go live in a couple minutes','Email sequence scheduler and creator earnings backends wired up','Marketplace creators can list and sell their own templates']},
   {date:'Jun 13, 2026',version:'v1.5',tag:'b-green',tagLabel:'New',title:'Creator Program + Domain Manager',desc:'Apply for a free Archon or Sovereign plan in exchange for authentic content. Full domain search, purchase, transfer, and DNS management.',items:['Creator Program application flow with tier selection','Domain availability search powered by AI','Transfer wizard with auth code walkthrough','Full DNS record manager (A, CNAME, MX, TXT)','Interactive prospect map on the dashboard']},
   {date:'Jun 12, 2026',version:'v1.4',tag:'b-gold',tagLabel:'Improved',title:'Mobile-First Overhaul + Scanner Freedom',desc:'Removed every restriction from the prospect scanner and rebuilt the entire layout to work at any screen size.',items:['Scan any city, country, or region — no restrictions','Any business type — type anything, not just categories','City picker with global autocomplete + geolocation','Hamburger nav for mobile devices','Landing page now loads smooth with zero jitter']},
   {date:'Jun 11, 2026',version:'v1.3',tag:'b-blue',tagLabel:'Platform',title:'Full Landing Page + Pricing Overhaul',desc:'Complete marketing site added before the dashboard. Six-tier pricing with full detailed feature lists per tier.',items:['Full landing page with all sections (stats, features, how it works, use cases, reviews, pricing, FAQ)','Carousel with 24 real testimonials','Creator Program landing section','Embedded live scanner — no sign-up required']},
@@ -6822,23 +6825,28 @@ function RoadmapPage({user, toast}) {
 
   const phases = [
     {phase:"Now — Shipped ✦",items:[
+      {title:"Prospect Scanner",desc:"Google Places integration returns real local businesses without a website, with detailed lead scoring, opening hours, price level, and real customer reviews. Real data only — no invented results.",status:"live"},
       {title:"Multi-Page Site Builder",desc:"Build Home, About, Services, Contact, Gallery, and Blog pages independently. Deploy all to GitHub at once.",status:"live"},
-      {title:"470+ Marketplace Templates",desc:"Templates across 41 categories. Browse, buy, save to library, and use as site starting points.",status:"live"},
-      {title:"AI Advisor (Sage)",desc:"Floating AI chat that knows your full platform context — page, prospects, revenue. Navigates the app for you.",status:"live"},
-      {title:"Prospect Scanner",desc:"Google Places integration returns real local businesses. AI fallback with detailed lead scoring.",status:"live"},
-      {title:"Pitch Generator",desc:"12 tones, custom pitch type, generates SMS + call script + email + follow-up in one shot.",status:"live"},
+      {title:"Visual Section Editor",desc:"Drag-and-drop reorder, duplicate/delete, and add sections; edit text and swap images inline on the live preview; page-level undo/redo.",status:"live"},
+      {title:"E-Commerce Shop Section",desc:"Add a product grid with working Buy Now buttons (real Stripe checkout) to any built client site.",status:"live"},
+      {title:"470+ Marketplace Templates",desc:"Templates across 41 categories. Browse, buy, save to library, and use as site starting points. Creators can list and sell their own.",status:"live"},
+      {title:"Pitch Generator",desc:"12 tones, custom pitch type, generates SMS + call script + email + follow-up in one shot — personalized with the business's real details.",status:"live"},
       {title:"Agency OS",desc:"Clients, proposals, contracts, invoices, revenue tracking, time tracker, referrals — full agency back-office.",status:"live"},
       {title:"AI Studio",desc:"17 tools: taglines, bios, ad copy, blog posts, FAQs, social captions, email sequences, and more.",status:"live"},
       {title:"AI Call Coach",desc:"Practice your pitch against an AI playing a skeptical business owner. Get coaching feedback after 4 exchanges.",status:"live"},
-      {title:"30-Day Archon Trial",desc:"Full Archon access, card required, auto-charges on day 31. 100 AI credits, 25% revenue share during trial.",status:"live"},
+      {title:"Saved-for-Later Watchlist",desc:"Save prospects to revisit; the app re-checks each against Google Places and flags what changed since you saved it.",status:"live"},
+      {title:"AI Advisor (Sage)",desc:"Floating AI chat that knows your full platform context — page, prospects, revenue. Navigates the app for you.",status:"live"},
+    ]},
+    {phase:"Backend-Ready — Activating",items:[
+      {title:"Creator Program",desc:"Apply to earn a comped plan for making content. Application flow, owner review/approval, and plan-granting all built.",status:"building"},
+      {title:"Email Sequence Scheduler",desc:"Build multi-step outreach sequences and auto-send them on schedule. Builder, enrollment, and the sending Worker are all built.",status:"building"},
+      {title:"Affiliate Program",desc:"Referral links with real signup attribution, referral tracking, and earnings. Backend and attribution are built.",status:"building"},
     ]},
     {phase:"Coming Soon",items:[
-      {title:"Drag-and-Drop Visual Editor",desc:"Wix-style visual editor for built sites. No code required.",status:"building"},
-      {title:"E-Commerce on Built Sites",desc:"Add product listings, cart, and Stripe checkout to any client site.",status:"building"},
-      {title:"Booking System",desc:"Calendar booking widget deployable on client sites.",status:"building"},
+      {title:"Creator Payouts (Stripe Connect)",desc:"Automated payouts to template creators. Earnings are tracked now; automated transfers are next.",status:"building"},
       {title:"Stripe Subscription Management",desc:"Upgrade, downgrade, and cancel from within the app.",status:"building"},
+      {title:"Full Visual Page Builder",desc:"Wix-style free-form editor on top of today's section editor.",status:"building"},
       {title:"Mobile App (iOS + Android)",desc:"Capacitor-wrapped native app with push notifications.",status:"building"},
-      {title:"Real Affiliate Tracking",desc:"Full backend for referral links, earnings, and payouts.",status:"building"},
     ]},
     {phase:"On the Horizon",items:[
       {title:"Voicemail Drop",desc:"Leave pre-recorded voicemails at scale for prospecting campaigns.",status:"planned"},

@@ -239,6 +239,31 @@ drop policy if exists "referred user records own referral" on referrals;
 create policy "referred user records own referral" on referrals
   for insert with check (auth.uid() = referred_user_id);
 
+-- ── 7. Feature requests (Roadmap page community board) ──────────────────────
+create table if not exists feature_requests (
+  id text primary key,
+  title text not null,
+  description text,
+  category text default 'feature',
+  votes int not null default 1,
+  user_email text,
+  created_at text
+);
+
+alter table feature_requests enable row level security;
+
+-- Public board: anyone signed in can read all requests, submit their own, and
+-- upvote. Kept permissive on purpose — it's a lightweight community wishlist,
+-- not sensitive data.
+drop policy if exists "anyone reads feature requests" on feature_requests;
+create policy "anyone reads feature requests" on feature_requests for select using (true);
+
+drop policy if exists "anyone submits feature requests" on feature_requests;
+create policy "anyone submits feature requests" on feature_requests for insert with check (true);
+
+drop policy if exists "anyone upvotes feature requests" on feature_requests;
+create policy "anyone upvotes feature requests" on feature_requests for update using (true);
+
 -- ============================================================================
 -- Done. After running this, tell Claude Code (or just refresh the app) —
 -- no restart needed, PostgREST picks up new tables/columns automatically.
