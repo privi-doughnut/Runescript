@@ -5010,7 +5010,20 @@ function AIStudioPage({prospects,toast}){
   const[opts,setOpts]=useState({platform:"Instagram",tone:"Professional",adGoal:"Awareness",seoType:"Blog Post"});
   const[customInput,setCustomInput]=useState("");
   const[copied,setCopied]=useState(false);
-  const TOOLS=[{id:"social",r:"ᚦ",l:"Social Media"},{id:"gbp",r:"ᚨ",l:"Google Business"},{id:"adcopy",r:"ᚲ",l:"Ad Copy"},{id:"seo",r:"ᛏ",l:"SEO Content"},{id:"brand",r:"ᚱ",l:"Brand Voice"},{id:"email",r:"ᚢ",l:"Email Campaign"},{id:"review",r:"ᛟ",l:"Review Response"}];
+  // Every tool here has a working prompt in generate() below. The 10 after
+  // Review Response used to have prompts but no sidebar entry — they were
+  // built but unreachable (which is why "17 tools" wasn't actually true).
+  const TOOLS=[
+    {id:"social",r:"ᚦ",l:"Social Media"},{id:"gbp",r:"ᚨ",l:"Google Business"},
+    {id:"adcopy",r:"ᚲ",l:"Ad Copy"},{id:"seo",r:"ᛏ",l:"SEO Content"},
+    {id:"brand",r:"ᚱ",l:"Brand Voice"},{id:"email",r:"ᚢ",l:"Email Campaign"},
+    {id:"review",r:"ᛟ",l:"Review Response"},{id:"competitor",r:"ᚹ",l:"Competitor Analysis"},
+    {id:"pricing",r:"ᛘ",l:"Pricing Advisor"},{id:"casestudy",r:"ᛉ",l:"Case Study"},
+    {id:"voicemail",r:"ᛖ",l:"Voicemail Scripts"},{id:"proposal2",r:"ᛗ",l:"1-Page Proposal"},
+    {id:"onboarding",r:"ᛜ",l:"Client Welcome"},{id:"pressrelease",r:"ᛥ",l:"Press Release"},
+    {id:"signature",r:"ᛃ",l:"Email Signature"},{id:"bizcard",r:"ᛒ",l:"Business Card"},
+    {id:"bulk",r:"ᚾ",l:"Bulk Cold Openers"},
+  ];
   const activeTool=TOOLS.find(t=>t.id===tool);
   const c=prospects.find(p=>p.id===selClient);
   const generate=async()=>{
