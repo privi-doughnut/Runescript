@@ -3273,6 +3273,23 @@ function CRMPage({prospects,updateProspect,removeProspect,setPage,toast}){
   const open=p=>{setSelected(p);setNoteVal(p.notes||"");setHealth(null);};
   const[health,setHealth]=useState(null);
   const[healthLoading,setHealthLoading]=useState(false);
+  // Lead Predictor: AI ranks the open pipeline so the user knows who to
+  // contact first. Analyzes the real signals we have (status, days since
+  // activity, lead score) — no fabricated data, just prioritization.
+  const[priority,setPriority]=useState(null);
+  const[priorityLoading,setPriorityLoading]=useState(false);
+  const prioritizePipeline=async()=>{
+    const open=prospects.filter(p=>!['Closed','Rejected'].includes(p.status));
+    if(open.length===0){toast('No open prospects to prioritize.','info');return;}
+    setPriorityLoading(true);setPriority(null);
+    try{
+      const list=open.slice(0,20).map(p=>{const d=p.lastActivity?Math.round((Date.now()-new Date(p.lastActivity).getTime())/864e5):null;return `${p.name} (${p.category||'business'}, status: ${p.status}, lead score ${p.leadScore||'?'}${d!=null?`, ${d}d since activity`:''})`;}).join('; ');
+      const raw=await callClaude(`You are a sales manager. Rank these leads by who to contact FIRST for the best chance to close, considering their status, lead score, and how long since last activity (stale hot leads are urgent). Return ONLY a JSON array, most-urgent first: [{"name":"exact name","reason":"short why"}]. Leads: ${list}`,1200);
+      const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
+      setPriority(Array.isArray(parsed)?parsed:[]);
+    }catch(e){toast('Could not prioritize — try again.','error');}
+    setPriorityLoading(false);
+  };
   // Per-prospect AI health check — reads the real CRM signals (status, days
   // since last activity, notes) and returns an engagement read, churn risk,
   // and one concrete next action. The "client health score — AI predicts
@@ -3332,6 +3349,24 @@ function CRMPage({prospects,updateProspect,removeProspect,setPage,toast}){
       </label>
       <button className="btn btn-ghost btn-sm" onClick={()=>setPage("scanner")}>+ Add</button></div></div>
       <ScoringNote/>
+      {prospects.filter(p=>!['Closed','Rejected'].includes(p.status)).length>0&&(
+        <div style={{marginBottom:10}}>
+          <button className="btn btn-ghost btn-sm" disabled={priorityLoading} onClick={prioritizePipeline}>{priorityLoading?<><Spinner/>Prioritizing…</>:'⚡ Prioritize My Pipeline'}</button>
+          {priority&&priority.length>0&&(
+            <div style={{marginTop:10,padding:'12px 14px',background:'rgba(201,168,76,.04)',border:'1px solid rgba(201,168,76,.12)'}}>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.56rem',letterSpacing:'1.5px',color:'#c9a84c',textTransform:'uppercase',marginBottom:8}}>Contact these first</div>
+              <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                {priority.slice(0,10).map((it,i)=>{const p=prospects.find(x=>x.name===it.name);return(
+                  <div key={i} style={{display:'flex',gap:10,alignItems:'flex-start',cursor:p?'pointer':'default'}} onClick={()=>p&&open(p)}>
+                    <span style={{fontFamily:"'Cinzel',serif",fontSize:'.9rem',fontWeight:700,color:'#c9a84c',flexShrink:0,minWidth:20}}>{i+1}</span>
+                    <div><span style={{fontSize:'.82rem',color:'#ddd8ce',fontWeight:600}}>{it.name}</span><span style={{fontSize:'.76rem',color:'#7a7888'}}> — {it.reason}</span></div>
+                  </div>
+                );})}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       <div className="pipe-strip">{STATUSES.map(s=><div key={s} className="pipe-col"><div className="pipe-n">{prospects.filter(p=>p.status===s).length}</div><div className="pipe-l">{s}</div></div>)}</div>
       {selectedIds.size>0&&(
         <div style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',background:'rgba(201,168,76,.08)',border:'1px solid rgba(201,168,76,.15)',marginBottom:8,flexWrap:'wrap'}}>
