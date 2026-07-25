@@ -107,6 +107,22 @@ function ScoreBadge({prospect, sm}) {
   );
 }
 
+// A small dismissible note explaining what lead scores mean and how they are
+// calculated — shown at the top of the Scanner and CRM so the numbers are
+// never mysterious. Dismissal persists so it does not nag.
+function ScoringNote() {
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => { window.storage.get('rs3_scoring_note_dismissed').then(r => { if (r?.value === 'true') setDismissed(true); }).catch(() => {}); }, []);
+  if (dismissed) return null;
+  return (
+    <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'10px 14px',background:'rgba(201,168,76,.05)',border:'1px solid rgba(201,168,76,.14)',marginBottom:12,fontSize:'.76rem',fontWeight:300,color:'#9a96a2',lineHeight:1.6}}>
+      <span style={{flexShrink:0,color:'#c9a84c'}}>ᚨ</span>
+      <span style={{flex:1}}><strong style={{color:'#c9b87a'}}>How lead scores work:</strong> Every business gets a 0–98 score for how good a prospect it is — higher = hotter lead. It weighs star rating, review volume, whether they lack a website (+28, the biggest opportunity signal), and whether they are an active business. <strong style={{color:'#c9b87a'}}>Hover any score</strong> to see exactly why that business scored what it did.</span>
+      <button onClick={() => { setDismissed(true); window.storage.set('rs3_scoring_note_dismissed', 'true').catch(() => {}); }} style={{background:'none',border:'none',color:'#3a3848',cursor:'pointer',fontSize:'1rem',flexShrink:0,lineHeight:1}} title="Dismiss">✕</button>
+    </div>
+  );
+}
+
 // Shows the real extra Google Places details captured during a scan (hours,
 // price, top reviews, Maps link) plus an editable owner/contact-name field.
 // The owner field is pre-seeded with the name-pattern guess (clearly labeled
@@ -2880,6 +2896,7 @@ function ScannerPage({onAdd,prospects,toast,setPage}){
         <div><div className="sh-title">Prospect Scanner</div><div className="sh-sub">Find any business, anywhere — no restrictions</div></div>
         {results.length>0&&<div className="sh-right"><button className="btn btn-ghost btn-sm" style={{marginRight:6}} onClick={()=>{const h=['Name','Phone','Address','City','Category','Rating','Reviews','Score','Website'];const rows=results.map(p=>[p.name,p.phone,p.address,p.city,p.category,p.rating,p.reviews,p.leadScore,p.website||'none']);const csv=[h,...rows].map(r=>r.map(v=>`"${v||''}"`).join(',')).join('\n');const b=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='scan-results.csv';a.click();toast(`Exported ${results.length} results.`,'success');}}>↓ CSV</button><button className="btn btn-ghost btn-sm" style={{marginRight:6}} onClick={clearScanner}>↺ Restart / Clear All</button><button className="btn btn-gold btn-sm" onClick={addAll}>+ Add All to CRM</button></div>}
       </div>
+      <ScoringNote/>
 
       {/* MODE TOGGLE */}
       <div style={{display:'flex',gap:0,marginBottom:12,border:'1px solid rgba(201,168,76,.12)'}}>
@@ -3310,6 +3327,7 @@ function CRMPage({prospects,updateProspect,removeProspect,setPage,toast}){
         }}/>
       </label>
       <button className="btn btn-ghost btn-sm" onClick={()=>setPage("scanner")}>+ Add</button></div></div>
+      <ScoringNote/>
       <div className="pipe-strip">{STATUSES.map(s=><div key={s} className="pipe-col"><div className="pipe-n">{prospects.filter(p=>p.status===s).length}</div><div className="pipe-l">{s}</div></div>)}</div>
       {selectedIds.size>0&&(
         <div style={{display:'flex',gap:10,alignItems:'center',padding:'8px 12px',background:'rgba(201,168,76,.08)',border:'1px solid rgba(201,168,76,.15)',marginBottom:8,flexWrap:'wrap'}}>
@@ -3342,7 +3360,7 @@ function CRMPage({prospects,updateProspect,removeProspect,setPage,toast}){
                     <div className="kanban-card-meta">{p.city} · {p.category}</div>
                     <div style={{display:'flex',alignItems:'center',gap:6}}>
                       <span style={{color:'#c9a84c',fontSize:'.6rem',letterSpacing:'1px'}}>{stars(p.rating)}</span>
-                      <span className={`badge ${scoreClass(p.leadScore)}`} style={{fontSize:'.52rem',padding:'1px 5px'}}>{p.leadScore}</span>
+                      <span onClick={e=>e.stopPropagation()}><ScoreBadge prospect={p} sm/></span>
                     </div>
                     <div className="kanban-move-row">
                       {["Not Contacted","Contacted","Read","Active","Closed","Rejected"].filter(s=>s!==status).slice(0,2).map(s=>(
@@ -3377,7 +3395,7 @@ function CRMPage({prospects,updateProspect,removeProspect,setPage,toast}){
                   <td className="td-main">{(()=>{const stale=["Contacted","Active","Read"].includes(p.status)&&p.lastActivity&&(new Date()-new Date(p.lastActivity))>7*864e5;return stale?<span title="No activity 7+ days" style={{color:"#e0a848",marginRight:5}}>⚠</span>:null;})()}{p.name}</td><td>{p.category}</td>
                   <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:".62rem",color:"#2e2d3c"}}>{p.city}</td>
                   <td><span style={{color:"#c9a84c",letterSpacing:"2px",fontSize:".7rem"}}>{"★".repeat(Math.round(p.rating))}</span></td>
-                  <td><span className={`badge ${scoreClass(p.leadScore)}`}>{p.leadScore}</span></td>
+                  <td onClick={e=>e.stopPropagation()}><ScoreBadge prospect={p} sm/></td>
                   <td onClick={e=>e.stopPropagation()}>
                       <select value={p.status} className="inp" style={{padding:'2px 6px',height:26,fontSize:'.64rem',cursor:'pointer',minWidth:110}} onChange={e=>{updateProspect(p.id,{status:e.target.value,lastActivity:now()});toast(`${p.name} → ${e.target.value}`,'success');}}>
                         {"Not Contacted,Contacted,Read,Active,Closed,Rejected".split(',').map(s=><option key={s} value={s}>{s}</option>)}
@@ -3396,7 +3414,8 @@ function CRMPage({prospects,updateProspect,removeProspect,setPage,toast}){
           <div className="drawer-bg" onClick={()=>setSelected(null)}/>
           <div className="drawer">
             <div className="dr-head"><div><div style={{fontFamily:"'Cinzel',serif",fontSize:"1rem",fontWeight:700,color:"#ddd8ce",marginBottom:6}}>{selected.name}</div><Badge status={selected.status}/></div><button className="dr-close" onClick={()=>setSelected(null)}>✕</button></div>
-            {[{l:"Phone",v:selected.phone},{l:"Address",v:selected.address},{l:"City",v:selected.city},{l:"Category",v:selected.category},{l:"Rating",v:`${selected.rating}★ (${selected.reviews} reviews)`},{l:"Lead Score",v:selected.leadScore}].map(({l,v})=><div key={l} className="dr-field"><div className="dr-label">{l}</div><div className="dr-val">{v}</div></div>)}
+            {[{l:"Phone",v:selected.phone},{l:"Address",v:selected.address},{l:"City",v:selected.city},{l:"Category",v:selected.category},{l:"Rating",v:`${selected.rating}★ (${selected.reviews} reviews)`}].map(({l,v})=><div key={l} className="dr-field"><div className="dr-label">{l}</div><div className="dr-val">{v}</div></div>)}
+            <div className="dr-field"><div className="dr-label">Lead Score</div><div className="dr-val" style={{display:'flex',alignItems:'center',gap:8}}><ScoreBadge prospect={selected}/> <span style={{fontSize:'.68rem',color:'#3a3848'}}>hover for why</span></div></div>
             <div className="dr-field"><div className="dr-label">Services</div><div style={{display:"flex",flexWrap:"wrap",gap:5,marginTop:5}}>{selected.services?.map(s=><span key={s} style={{fontFamily:"'JetBrains Mono',monospace",fontSize:".56rem",letterSpacing:"1px",textTransform:"uppercase",padding:"3px 8px",border:"1px solid rgba(201,168,76,.08)",color:"#2e2d3c"}}>{s}</span>)}</div></div>
             <div className="dr-field">
               <div className="dr-label">Owner / Main Contact</div>

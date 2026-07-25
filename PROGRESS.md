@@ -36,6 +36,29 @@ _Last updated: 2026-07-24 (fifth session — roadmap audit, SQL activated, hones
 
 ---
 
+## Pay-list completion estimate (2026-07-25)
+
+Honest estimate of how much of the ~200-item pricing-tier feature list is
+achievable, so expectations stay grounded:
+
+- **~15% already built** (were listed as if pending — see "Already built" below).
+- **~30–35% buildable solo, no blockers** (AI generators, client-site sections,
+  PageSpeed/Core Web Vitals, live chat, reporting, health/lead scoring, etc.).
+- **~15% buildable but need owner account/service setup** (Stripe features,
+  Twilio voicemail/SMS, heatmap embeds) — buildable once those accounts exist.
+- **~25% large, dedicated multi-session builds** (real-time collaboration,
+  teams/seats/roles, white-label + reseller, full public API, finishing the
+  mobile app, no-SQL database builder) — each deserves its own focused session.
+- **~5% not honestly buildable** (LinkedIn scraping — ToS/blocking).
+
+**Net: ~60–70% end-to-end achievable if the owner handles the account setups,
+or ~50% purely on my own before any owner action.** The remaining ~30% are the
+big-rock builds above. Strategy: build the self-contained majority first
+(in progress), then the account-dependent ones once setups are done, then
+scope the big rocks individually. Trim/adjust pricing near launch, not before.
+
+---
+
 ## Feature backlog captured from the pricing tiers (2026-07-24)
 
 The pricing tiers historically listed ~200 features, most aspirational/not-built.
