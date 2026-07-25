@@ -3249,7 +3249,22 @@ function CRMPage({prospects,updateProspect,removeProspect,setPage,toast}){
   const STATUSES=["Not Contacted","Contacted","Read","Active","Closed","Rejected"];
   const searchLow=search.toLowerCase();
   const filtered=(filter==="All"?prospects:prospects.filter(p=>p.status===filter)).filter(p=>!search||(p.name||'').toLowerCase().includes(searchLow)||(p.city||'').toLowerCase().includes(searchLow)||(p.category||'').toLowerCase().includes(searchLow)||(p.notes||'').toLowerCase().includes(searchLow)||p.name?.toLowerCase().includes(search.toLowerCase())||p.city?.toLowerCase().includes(search.toLowerCase())||p.category?.toLowerCase().includes(search.toLowerCase()));
-  const open=p=>{setSelected(p);setNoteVal(p.notes||"");};
+  const open=p=>{setSelected(p);setNoteVal(p.notes||"");setHealth(null);};
+  const[health,setHealth]=useState(null);
+  const[healthLoading,setHealthLoading]=useState(false);
+  // Per-prospect AI health check — reads the real CRM signals (status, days
+  // since last activity, notes) and returns an engagement read, churn risk,
+  // and one concrete next action. The "client health score — AI predicts
+  // churn" tier feature, over data we already have.
+  const runHealthCheck=async(p)=>{
+    setHealthLoading(true);setHealth(null);
+    try{
+      const days=p.lastActivity?Math.max(0,Math.round((Date.now()-new Date(p.lastActivity).getTime())/864e5)):null;
+      const raw=await callClaude(`You are a sales pipeline analyst. Analyze this lead and return ONLY JSON: {"engagement":"Hot|Warm|Cold","churnRisk":"Low|Medium|High","summary":"one sentence","nextAction":"one specific next step"}. Lead: "${p.name}", a ${p.category||'local business'} in ${p.city||'their area'}. Pipeline status: ${p.status||'Not Contacted'}.${days!=null?` Last activity ${days} day(s) ago.`:''} Notes: ${p.notes||'none'}.`,300);
+      setHealth(JSON.parse(raw.replace(/```json|```/g,'').trim()));
+    }catch(e){toast('Health check failed — try again.','error');}
+    setHealthLoading(false);
+  };
   const saveNote=()=>{updateProspect(selected.id,{notes:noteVal,lastActivity:now()});setSelected(prev=>({...prev,notes:noteVal}));toast("Note saved.","success");};
   const changeStatus=s=>{updateProspect(selected.id,{status:s,lastActivity:now()});setSelected(prev=>({...prev,status:s}));toast(`Status → ${s}`,"info");};
   return(
@@ -3355,7 +3370,7 @@ function CRMPage({prospects,updateProspect,removeProspect,setPage,toast}){
                     <th>Business</th><th>Category</th><th>City</th><th>Rating</th><th>Score</th><th>Status</th><th>Added</th><th/>
                   </tr></thead>
               <tbody>{filtered.map(p=>(
-                <tr key={p.id}>
+                <tr key={p.id} onClick={()=>open(p)} style={{cursor:'pointer'}}>
                     <td onClick={e=>e.stopPropagation()} style={{paddingLeft:8}}>
                       <input type="checkbox" style={{cursor:'pointer'}} checked={selectedIds.has(p.id)} onChange={()=>setSelectedIds(prev=>{const n=new Set(prev);n.has(p.id)?n.delete(p.id):n.add(p.id);return n;})}/>
                     </td>
@@ -3398,7 +3413,18 @@ function CRMPage({prospects,updateProspect,removeProspect,setPage,toast}){
             <div className="divider"/>
             <div className="dr-label" style={{marginBottom:6}}>Notes</div>
             <textarea className="inp" rows={4} value={noteVal} onChange={e=>setNoteVal(e.target.value)} placeholder="Add notes…"/>
-            <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}><button className="btn btn-gold btn-sm" onClick={saveNote}>Save Note</button><button className="btn btn-ghost btn-sm" onClick={()=>setPage("pitch")}>Go to Pitch →</button><button className="btn btn-ghost btn-sm" onClick={()=>{changeStatus("Contacted");toast("Status updated. Go to Pitch Generator to build the package.","info");}}>Mark Contacted</button></div>
+            <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}><button className="btn btn-gold btn-sm" onClick={saveNote}>Save Note</button><button className="btn btn-ghost btn-sm" onClick={()=>setPage("pitch")}>Go to Pitch →</button><button className="btn btn-ghost btn-sm" onClick={()=>{changeStatus("Contacted");toast("Status updated. Go to Pitch Generator to build the package.","info");}}>Mark Contacted</button><button className="btn btn-ghost btn-sm" disabled={healthLoading} onClick={()=>runHealthCheck(selected)}>{healthLoading?'Analyzing…':'🩺 AI Health Check'}</button></div>
+            {health&&(
+              <div style={{marginTop:12,padding:'12px 14px',background:'rgba(201,168,76,.04)',border:'1px solid rgba(201,168,76,.12)'}}>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:8}}>
+                  <span className={`badge ${health.engagement==='Hot'?'b-green':health.engagement==='Warm'?'b-gold':'b-red'}`}>{health.engagement} lead</span>
+                  <span className={`badge ${health.churnRisk==='Low'?'b-green':health.churnRisk==='Medium'?'b-gold':'b-red'}`}>Churn risk: {health.churnRisk}</span>
+                </div>
+                <div style={{fontSize:'.8rem',fontWeight:300,color:'#9a96a2',lineHeight:1.6,marginBottom:8}}>{health.summary}</div>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.54rem',letterSpacing:'1px',color:'#c9a84c',textTransform:'uppercase',marginBottom:3}}>Next action</div>
+                <div style={{fontSize:'.8rem',color:'#c9b87a',lineHeight:1.6}}>{health.nextAction}</div>
+              </div>
+            )}
             <div className="divider"/>
             <div style={{marginBottom:8}}>
               <div className="dr-label" style={{marginBottom:8}}>Activity Log</div>
