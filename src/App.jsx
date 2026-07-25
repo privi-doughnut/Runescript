@@ -5047,6 +5047,9 @@ function AIStudioPage({prospects,toast}){
     {id:"signature",r:"ᛃ",l:"Email Signature"},{id:"bizcard",r:"ᛒ",l:"Business Card"},
     {id:"bulk",r:"ᚾ",l:"Bulk Cold Openers"},
     {id:"localseo",r:"ᛢ",l:"Local SEO Audit"},
+    {id:"persona",r:"ᛲ",l:"Customer Personas"},
+    {id:"survey",r:"ᛯ",l:"Survey Builder"},
+    {id:"summarizer",r:"ᛞ",l:"Call Summarizer"},
   ];
   const activeTool=TOOLS.find(t=>t.id===tool);
   const c=prospects.find(p=>p.id===selClient);
@@ -5074,6 +5077,9 @@ function AIStudioPage({prospects,toast}){
       else if(tool==="bizcard")prompt=`Design a business card layout description for a web designer. Business: ${biz}. ${customInput?`Additional info: ${customInput}.`:''} Provide: front side layout (name, title, contact info, tagline), back side layout (QR code placeholder, services list, social handles), color recommendations, font suggestions, and key design notes. Format clearly with Front / Back sections.`;
       else if(tool==="bulk"){const names=prospects.slice(0,5).map(p=>p.name).join(', ');prompt=`Write personalized 2-sentence cold email openers for these businesses that need a website: ${names}. Reference each one's specific business type. Number them 1-5.`;}
       else if(tool==="localseo")prompt=`Act as a local SEO consultant. Give a specific, actionable local-SEO audit and plan for ${biz} ${customInput?`Extra context: ${customInput}.`:''} Cover: 1) Google Business Profile optimization (categories, services, photos, posts), 2) NAP consistency and top citation/directory sites to claim, 3) Local keywords to target (with example page titles), 4) Review strategy to rank higher in the map pack, 5) On-page/local schema recommendations, 6) The single highest-impact fix to do first. Be concrete and prioritized.`;
+      else if(tool==="persona")prompt=`Build 2-3 detailed customer personas for ${biz} ${customInput?`Context: ${customInput}.`:''} For each persona include: a name and one-line identity, demographics, their main goal, their biggest pain point, what would make them choose this business, where they spend time online, and the single message that would resonate most. Make them realistic and specific to this business type.`;
+      else if(tool==="survey")prompt=`Create a short, high-signal customer survey for ${biz} ${customInput?`Goal: ${customInput}.`:''} Include: a one-line intro, 6-8 questions mixing rating scales and open-ended (covering satisfaction, what they value, what could improve, and likelihood to refer), and a thank-you closing line. Keep it quick to complete.`;
+      else if(tool==="summarizer")prompt=`Summarize this sales call for a web designer. Notes/transcript: "${customInput||'no notes provided'}". Return: 1) a 2-3 sentence summary, 2) the prospect's interest level (High/Medium/Low) with why, 3) key objections raised, 4) what they seemed to care about most, 5) 2-3 concrete next steps. Be tactical.`;
       const finalPrompt=brandVoice?prompt+`\n\nWrite in this brand voice: ${brandVoice}.`:prompt;
       const result=await callClaude(finalPrompt,1400);
       setOutput(result);toast("Content generated.","success");
@@ -5099,6 +5105,8 @@ function AIStudioPage({prospects,toast}){
             {tool==="competitor"&&<div className="field"><label>Competitor URL or Name</label><textarea className="inp" rows={2} placeholder="Paste their URL or describe their business…" value={customInput} onChange={e=>setCustomInput(e.target.value)}/></div>}
             {(tool==="pricing"||tool==="casestudy"||tool==="pressrelease")&&<div className="field"><label>Additional Context (optional)</label><textarea className="inp" rows={2} placeholder="Project details, results, specific numbers…" value={customInput} onChange={e=>setCustomInput(e.target.value)}/></div>}
             {(tool==="signature"||tool==="bizcard")&&<div className="field"><label>Additional Details</label><textarea className="inp" rows={2} placeholder={tool==="signature"?"Your name, title, any specific details…":"Your name, specialties, social handles…"} value={customInput} onChange={e=>setCustomInput(e.target.value)}/></div>}
+            {tool==="summarizer"&&<div className="field"><label>Call Notes or Transcript</label><textarea className="inp" rows={4} placeholder="Paste your sales-call notes or transcript here…" value={customInput} onChange={e=>setCustomInput(e.target.value)}/></div>}
+            {(tool==="persona"||tool==="survey")&&<div className="field"><label>Additional Context (optional)</label><textarea className="inp" rows={2} placeholder="Anything specific about their customers or goals…" value={customInput} onChange={e=>setCustomInput(e.target.value)}/></div>}
             {tool==="bulk"&&<p style={{fontSize:'.8rem',fontWeight:300,color:'#5a5868',lineHeight:1.7,marginBottom:10}}>Uses your top 5 CRM prospects automatically. Add prospects to CRM first to activate this.</p>}
             <div className="field"><label>Brand Voice (optional)</label><input className="inp" placeholder="e.g. bold, witty, premium…" value={brandVoice} onChange={e=>{setBrandVoice(e.target.value);window.storage.set('rs3_brandvoice',e.target.value).catch(()=>{});}} style={{fontSize:'.78rem'}}/></div>
             <button className="btn btn-gold btn-full" onClick={generate} disabled={loading||(!selClient&&!customInput)}>{loading?<><Spinner/>Generating…</>:"Generate Content →"}</button>
