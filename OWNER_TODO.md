@@ -53,7 +53,18 @@ Once #1 and #2 are done and real applications/sales start coming in: the Creator
 
 For per-client calendar integration — needs a privacy policy, homepage, and demo video before Google will verify the app. Not urgent, no other feature depends on it.
 
-## 10. (Optional) Nice-to-haves, not blocking anything
+## 10. (Optional, small) Enable Google PageSpeed for the real Site Analyzer speed test
+
+The Site Analyzer now has a "Real Speed Test" that pulls actual performance
+scores + Core Web Vitals from Google PageSpeed Insights. It works keyless off
+Google's free shared quota, but that quota is frequently exhausted (it errored
+"quota exceeded" during testing). For reliable use: in Google Cloud Console,
+enable the **PageSpeed Insights API**, create an API key (a plain one, no HTTP-
+referrer restriction, or allowlist your Cloudflare domain), and paste it into
+Settings → API Keys → "Google PageSpeed API Key". The feature degrades
+gracefully until then (shows a clear "add a key" message, never fake data).
+
+## 11. (Optional) Nice-to-haves, not blocking anything
 
 - Purchase the `runescript.app` domain, if you still want it.
 - Buffer/Ayrshare integration for social scheduling, Twilio for SMS — neither is wired up; only add if there's an actual near-term need.

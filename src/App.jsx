@@ -5336,7 +5336,7 @@ function MarketplacePage({toast,user}){
 function SettingsPage({user,onUpdateUser,toast,setProspects,setPitches,setProposals,setInvoices,accentColor,setAccentColor,setScreen}){
   const[name,setName]=useState(user?.name||'');
   const[email,setEmail]=useState(user?.email||'');
-  const[keys,setKeys]=useState({github:'',netlify:'',stripe:'',places:'AIzaSyA-mPZjkn4fohWEedTC6NOjI7T2X5Dge8A'});
+  const[keys,setKeys]=useState({github:'',netlify:'',stripe:'',places:'AIzaSyA-mPZjkn4fohWEedTC6NOjI7T2X5Dge8A',pagespeed:''});
   const[autoRedirect,setAutoRedirect]=useState(false);
   const[devCode,setDevCode]=useState('');
   const[devUnlocked,setDevUnlocked]=useState(false);
@@ -5346,7 +5346,7 @@ function SettingsPage({user,onUpdateUser,toast,setProspects,setPitches,setPropos
 
   useEffect(()=>{
     window.storage.get('rs3_autoredirect').then(r=>{if(r)setAutoRedirect(r.value==='true');}).catch(()=>{});
-    ['github','netlify','stripe','places'].forEach(k=>{
+    ['github','netlify','stripe','places','pagespeed'].forEach(k=>{
       window.storage.get(`rs3_${k}_key`).then(r=>{if(r)setKeys(prev=>({...prev,[k]:r.value}));}).catch(()=>{});
     });
   },[]);
@@ -5397,6 +5397,7 @@ function SettingsPage({user,onUpdateUser,toast,setProspects,setPitches,setPropos
               {key:'netlify',label:'Netlify Access Token',placeholder:'nfp_xxxxxxxxxxxx'},
               {key:'stripe',label:'Stripe Secret Key',placeholder:'sk_live_xxxxxxxxxxxx'},
               {key:'places',label:'Google Places API Key',placeholder:'AIzaSy...'},
+              {key:'pagespeed',label:'Google PageSpeed API Key (for the Site Analyzer speed test)',placeholder:'AIzaSy...'},
             ].map(k=>(
               <div key={k.key} className="field" style={{margin:0}}>
                 <label>{k.label}</label>
@@ -8077,6 +8078,44 @@ function CompetitorAnalyzerPage({toast}) {
   const [bizType, setBizType] = useState('');
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState(null);
+  const [speed, setSpeed] = useState(null);
+  const [speedLoading, setSpeedLoading] = useState(false);
+
+  // Real speed measurement via Google PageSpeed Insights (Lighthouse) — actual
+  // performance score + Core Web Vitals, not an AI estimate. Public API,
+  // CORS-enabled, works without a key at low volume (a PageSpeed API key in
+  // Settings would raise the rate limit — optional, see OWNER_TODO).
+  const checkSpeed = async () => {
+    let u = url.trim();
+    if (!u) { toast('Enter a website URL first.', 'error'); return; }
+    if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+    if (!/\.[a-z]{2,}/i.test(u)) { toast('That does not look like a full website URL.', 'error'); return; }
+    setSpeedLoading(true); setSpeed(null);
+    try {
+      let key = '';
+      try { const r = await window.storage.get('rs3_pagespeed_key'); if (r?.value) key = r.value; } catch(e) {}
+      const resp = await fetch(`https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(u)}&category=performance&strategy=mobile${key?`&key=${key}`:''}`);
+      const data = await resp.json();
+      if (data.error) {
+        const msg = data.error.message || '';
+        if (/quota|rate limit/i.test(msg) && !key) throw new Error('Google’s free shared quota is used up for today. Add a PageSpeed API key in Settings for reliable, unlimited tests.');
+        throw new Error(msg || 'PageSpeed could not analyze that URL');
+      }
+      const lh = data.lighthouseResult; const a = lh?.audits || {};
+      const score = Math.round((lh?.categories?.performance?.score ?? 0) * 100);
+      const metrics = [
+        {k:'Largest Contentful Paint', a:a['largest-contentful-paint']},
+        {k:'Cumulative Layout Shift', a:a['cumulative-layout-shift']},
+        {k:'First Contentful Paint', a:a['first-contentful-paint']},
+        {k:'Total Blocking Time', a:a['total-blocking-time']},
+        {k:'Speed Index', a:a['speed-index']},
+      ].filter(m=>m.a?.displayValue).map(m=>({k:m.k, v:m.a.displayValue, s:m.a.score}));
+      setSpeed({ score, metrics, testedUrl: u });
+      toast(`Real speed test done — score ${score}/100.`, 'success');
+    } catch(e) { toast('Speed test failed: ' + (e.message || 'try a full URL like example.com'), 'error'); }
+    setSpeedLoading(false);
+  };
+  const metricColor = s => s==null ? '#5a5868' : s>=0.9 ? '#7ac89a' : s>=0.5 ? '#c9a84c' : '#e07878';
 
   const analyze = async () => {
     if (!url.trim()) { toast('Enter a URL or business name.', 'error'); return; }
@@ -8130,7 +8169,34 @@ Return ONLY valid JSON.`;
             {loading?<Spinner/>:'Analyze →'}
           </button>
         </div>
+        <div style={{marginTop:10,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <button className="btn btn-ghost btn-sm" onClick={checkSpeed} disabled={speedLoading}>{speedLoading?<><Spinner/>Testing…</>:'⚡ Real Speed Test'}</button>
+          <span style={{fontSize:'.68rem',color:'#3a3848'}}>Measures actual load speed + Core Web Vitals via Google (needs a real website URL, not just a name).</span>
+        </div>
       </div>
+
+      {speed&&(
+        <div className="card" style={{marginBottom:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:14,flexWrap:'wrap'}}>
+            <div style={{width:64,height:64,borderRadius:'50%',border:`3px solid ${metricColor(speed.score/100)}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+              <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'1.3rem',fontWeight:700,color:metricColor(speed.score/100)}}>{speed.score}</span>
+            </div>
+            <div>
+              <div style={{fontFamily:"'Cinzel',serif",fontSize:'.95rem',fontWeight:700,color:'#ddd8ce'}}>Real Performance Score (mobile)</div>
+              <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.58rem',letterSpacing:'1px',color:'#3a3848',wordBreak:'break-all'}}>{speed.testedUrl} · measured by Google Lighthouse</div>
+            </div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:8}}>
+            {speed.metrics.map((m,i)=>(
+              <div key={i} style={{padding:'8px 10px',background:'rgba(201,168,76,.03)',border:'1px solid rgba(201,168,76,.06)'}}>
+                <div style={{fontSize:'.62rem',color:'#5a5868',marginBottom:3}}>{m.k}</div>
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.95rem',fontWeight:700,color:metricColor(m.s)}}>{m.v}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{fontSize:'.7rem',color:'#3a3848',marginTop:10,lineHeight:1.6}}>Green = good, gold = needs work, red = poor. A low score here is real, hard evidence to open your pitch with.</div>
+        </div>
+      )}
 
       {analysis&&(
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:12}}>
