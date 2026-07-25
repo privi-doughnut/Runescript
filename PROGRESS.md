@@ -4,6 +4,38 @@ _Last updated: 2026-07-24 (fifth session — roadmap audit, SQL activated, hones
 
 ---
 
+## Fifth session (2026-07-24/25): SQL activated, honesty pass, Option-C builds
+
+- **SUPABASE_FINAL.sql ran successfully** (owner). Fixed an idempotency trap
+  first (a pre-existing older `referrals` table needed explicit
+  `add column if not exists` guards). Verified live: Creator Program
+  applications submit and Affiliate handles save against the real tables.
+- **Roadmap + Changelog audited** for honesty; added the `feature_requests`
+  table so the community board works.
+- **Landing stats** replaced (fabricated usage numbers → real product-capability
+  stats). **Dead legal-contact button** fixed (had no handler + dead domain).
+- **Option C — started building the buildable-now backlog** (before trimming
+  pricing). Built this session:
+  - 9 self-contained client-site sections added to the Site Builder palette:
+    FAQ, Team, Menu, Booking, Newsletter, Map, Video, Loyalty, Stats.
+  - AI review-response drafts (per real Google review, in prospect details).
+  - AI Client Health Score / churn prediction (CRM drawer).
+  - Confirmed client code export already existed (Download All / Clone / per-page).
+  - Fixed a real bug: CRM Table-view rows didn't open the detail drawer.
+
+### Owner-action items noted this session (for the end-of-build batch)
+- **Stripe** still parked — everything Stripe (Connect payouts, subscription
+  billing on client sites, e-signature+payment, multi-currency, abandoned cart)
+  waits on Stripe setup.
+- Landing/pricing **honesty flags**: pricing tiers still list many not-yet-built
+  features (see backlog below). Per owner: build everything buildable first,
+  THEN trim/adjust pricing near launch. Don't trim yet.
+- Client-site sections that post via `mailto:you@example.com` use a placeholder
+  address — fine as a template default (the agency edits it per client), just
+  noting it's intentional.
+
+---
+
 ## Feature backlog captured from the pricing tiers (2026-07-24)
 
 The pricing tiers historically listed ~200 features, most aspirational/not-built.
