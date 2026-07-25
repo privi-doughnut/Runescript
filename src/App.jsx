@@ -5023,6 +5023,7 @@ function AIStudioPage({prospects,toast}){
     {id:"onboarding",r:"ᛜ",l:"Client Welcome"},{id:"pressrelease",r:"ᛥ",l:"Press Release"},
     {id:"signature",r:"ᛃ",l:"Email Signature"},{id:"bizcard",r:"ᛒ",l:"Business Card"},
     {id:"bulk",r:"ᚾ",l:"Bulk Cold Openers"},
+    {id:"localseo",r:"ᛢ",l:"Local SEO Audit"},
   ];
   const activeTool=TOOLS.find(t=>t.id===tool);
   const c=prospects.find(p=>p.id===selClient);
@@ -5049,6 +5050,7 @@ function AIStudioPage({prospects,toast}){
       else if(tool==="signature")prompt=`Create a professional HTML email signature for a web designer at an agency. Business: ${biz}. ${customInput?`Additional info: ${customInput}.`:''} Include: name placeholder, title, agency name, phone, email, website URL, and a subtle color accent using hex #c9a84c. Return the HTML only, no explanation.`;
       else if(tool==="bizcard")prompt=`Design a business card layout description for a web designer. Business: ${biz}. ${customInput?`Additional info: ${customInput}.`:''} Provide: front side layout (name, title, contact info, tagline), back side layout (QR code placeholder, services list, social handles), color recommendations, font suggestions, and key design notes. Format clearly with Front / Back sections.`;
       else if(tool==="bulk"){const names=prospects.slice(0,5).map(p=>p.name).join(', ');prompt=`Write personalized 2-sentence cold email openers for these businesses that need a website: ${names}. Reference each one's specific business type. Number them 1-5.`;}
+      else if(tool==="localseo")prompt=`Act as a local SEO consultant. Give a specific, actionable local-SEO audit and plan for ${biz} ${customInput?`Extra context: ${customInput}.`:''} Cover: 1) Google Business Profile optimization (categories, services, photos, posts), 2) NAP consistency and top citation/directory sites to claim, 3) Local keywords to target (with example page titles), 4) Review strategy to rank higher in the map pack, 5) On-page/local schema recommendations, 6) The single highest-impact fix to do first. Be concrete and prioritized.`;
       const finalPrompt=brandVoice?prompt+`\n\nWrite in this brand voice: ${brandVoice}.`:prompt;
       const result=await callClaude(finalPrompt,1400);
       setOutput(result);toast("Content generated.","success");
