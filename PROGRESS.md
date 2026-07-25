@@ -14,14 +14,23 @@ _Last updated: 2026-07-24 (fifth session — roadmap audit, SQL activated, hones
   table so the community board works.
 - **Landing stats** replaced (fabricated usage numbers → real product-capability
   stats). **Dead legal-contact button** fixed (had no handler + dead domain).
-- **Option C — started building the buildable-now backlog** (before trimming
-  pricing). Built this session:
-  - 9 self-contained client-site sections added to the Site Builder palette:
-    FAQ, Team, Menu, Booking, Newsletter, Map, Video, Loyalty, Stats.
+- **Option C — building the buildable-now backlog** (before trimming pricing).
+  Built this session:
+  - 10 self-contained client-site sections added to the Site Builder palette:
+    FAQ, Team, Menu, Booking, Newsletter, Map, Video, Loyalty, Stats, Live Chat.
   - AI review-response drafts (per real Google review, in prospect details).
   - AI Client Health Score / churn prediction (CRM drawer).
+  - **Unlocked 10 built-but-hidden AI Studio tools** (sidebar showed 7 of 17)
+    and added 4 more (Local SEO Audit, Customer Personas, Survey Builder, Call
+    Summarizer) → **AI Studio now exposes 21 tools**.
+  - Real PageSpeed / Core Web Vitals speed test in the Site Analyzer (replaced
+    an AI *guess* with real Lighthouse measurement; optional key field added).
+  - Lead Predictor — AI "Prioritize My Pipeline" in the CRM.
+  - Lead-score transparency: why-hover in CRM (table/kanban/drawer) + a
+    dismissible scoring note on Scanner and CRM.
   - Confirmed client code export already existed (Download All / Clone / per-page).
-  - Fixed a real bug: CRM Table-view rows didn't open the detail drawer.
+  - Fixed real bugs: CRM Table-view rows didn't open the detail drawer;
+    the "17 tools" claim was false (only 7 reachable).
 
 ### Owner-action items noted this session (for the end-of-build batch)
 - **Stripe** still parked — everything Stripe (Connect payouts, subscription
@@ -33,6 +42,10 @@ _Last updated: 2026-07-24 (fifth session — roadmap audit, SQL activated, hones
 - Client-site sections that post via `mailto:you@example.com` use a placeholder
   address — fine as a template default (the agency edits it per client), just
   noting it's intentional.
+- **PageSpeed** speed test needs the owner to enable the PageSpeed Insights API
+  and add a key in Settings (field is ready) for reliable use — Google's free
+  shared quota is exhausted. Degrades gracefully (never fabricates). See
+  OWNER_TODO #10.
 
 ---
 
