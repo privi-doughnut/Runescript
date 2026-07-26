@@ -8349,6 +8349,10 @@ Return ONLY valid JSON.`;
                 </div>
               ))}
             </div>
+            <div style={{display:'flex',gap:8,marginTop:14,flexWrap:'wrap'}}>
+              <button className="btn btn-ghost btn-sm" onClick={()=>{navigator.clipboard.writeText(analysis.openingLine||'');toast('Opening line copied.','success');}}>Copy Opening Line</button>
+              <button className="btn btn-ghost btn-sm" onClick={()=>{const txt=`SITE ANALYSIS — ${url}\n\nScore: ${analysis.overallScore}/100\n\nIssues:\n${(analysis.issues||[]).map(i=>`- [${i.severity}] ${i.category}: ${i.detail}`).join('\n')}\n\nOpportunities:\n${(analysis.opportunities||[]).map(o=>`- ${o}`).join('\n')}\n\nOpening line: "${analysis.openingLine}"\nPitch angle: ${analysis.pitchAngle}\nEstimated ROI: ${analysis.estimatedROI}`;navigator.clipboard.writeText(txt);toast('Full analysis copied.','success');}}>Copy Full Analysis</button>
+            </div>
           </div>
         </div>
       )}
