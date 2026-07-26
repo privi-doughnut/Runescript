@@ -28,9 +28,20 @@ _Last updated: 2026-07-24 (fifth session — roadmap audit, SQL activated, hones
   - Lead Predictor — AI "Prioritize My Pipeline" in the CRM.
   - Lead-score transparency: why-hover in CRM (table/kanban/drawer) + a
     dismissible scoring note on Scanner and CRM.
+  - Added 3 more AI Studio tools (Customer Personas, Survey Builder, Call
+    Summarizer) + Schema & AEO → **AI Studio now 22 tools**.
+  - 2 more client-site sections (Events, Intake Form) → 12 total added this
+    session; plus Live Chat.
+  - Automated Client Reporting (Agency OS) — real figures + AI narrative.
+  - **Built the two blank Agency OS tabs**: Contracts (AI service-agreement
+    generator) and Onboarding (repeatable new-client checklist) — both were
+    in the sidebar with NO render branch (showed blank when clicked).
+  - PageSpeed refactored to route through the Worker (shared Cloudflare
+    secret) so it works for ALL users, not per-browser (see owner items).
   - Confirmed client code export already existed (Download All / Clone / per-page).
   - Fixed real bugs: CRM Table-view rows didn't open the detail drawer;
-    the "17 tools" claim was false (only 7 reachable).
+    the "17 tools" claim was false (only 7 reachable); Contracts + Onboarding
+    Agency OS tabs were blank.
 
 ### Owner-action items noted this session (for the end-of-build batch)
 - **Stripe** still parked — everything Stripe (Connect payouts, subscription
