@@ -55,14 +55,28 @@ For per-client calendar integration — needs a privacy policy, homepage, and de
 
 ## 10. (Optional, small) Enable Google PageSpeed for the real Site Analyzer speed test
 
-The Site Analyzer now has a "Real Speed Test" that pulls actual performance
-scores + Core Web Vitals from Google PageSpeed Insights. It works keyless off
-Google's free shared quota, but that quota is frequently exhausted (it errored
-"quota exceeded" during testing). For reliable use: in Google Cloud Console,
-enable the **PageSpeed Insights API**, create an API key (a plain one, no HTTP-
-referrer restriction, or allowlist your Cloudflare domain), and paste it into
-Settings → API Keys → "Google PageSpeed API Key". The feature degrades
-gracefully until then (shows a clear "add a key" message, never fake data).
+The Site Analyzer has a "Real Speed Test" that pulls actual performance scores +
+Core Web Vitals from Google PageSpeed Insights. It runs through the Worker, so
+the key is a **shared Cloudflare secret** — set it ONCE and it works for *every*
+user of the app (they do NOT each need their own key). It also keeps the key
+hidden server-side (unlike the Places key, which is exposed in the client code).
+
+**Why not Settings?** A Settings field only saves to *your own browser's* local
+storage — it would not propagate to other users. The Places key "propagates"
+only because it's hardcoded in the app source, not because Settings syncs. The
+Worker-secret approach is the correct way to share a key across all users.
+
+Steps:
+1. Google Cloud Console → enable the **PageSpeed Insights API** on your project.
+2. Create an API key (a plain server key — no HTTP-referrer restriction, since
+   it's called from the Worker, not a browser).
+3. Add it as a Cloudflare Worker secret named **`PAGESPEED_API_KEY`**
+   (Workers & Pages → runescript → Settings → Variables and Secrets → add
+   encrypted variable, or `wrangler secret put PAGESPEED_API_KEY`).
+
+Until then it works keyless off Google's free shared quota, but that quota is
+usually exhausted (errors "quota exceeded"). Degrades gracefully — shows a clear
+"add a key" message, never fabricates a score.
 
 ## 11. (Optional) Nice-to-haves, not blocking anything
 

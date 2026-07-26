@@ -42,10 +42,19 @@ _Last updated: 2026-07-24 (fifth session — roadmap audit, SQL activated, hones
 - Client-site sections that post via `mailto:you@example.com` use a placeholder
   address — fine as a template default (the agency edits it per client), just
   noting it's intentional.
-- **PageSpeed** speed test needs the owner to enable the PageSpeed Insights API
-  and add a key in Settings (field is ready) for reliable use — Google's free
-  shared quota is exhausted. Degrades gracefully (never fabricates). See
-  OWNER_TODO #10.
+- **PageSpeed** speed test now routes through the Worker's `/pagespeed` proxy so
+  the key is a **shared Cloudflare secret** (`PAGESPEED_API_KEY`) that works for
+  ALL users at once — NOT a per-user Settings field (that only affects one
+  browser; corrected this after the owner asked whether Settings propagates —
+  it does not). Owner action: enable the PageSpeed Insights API + add the
+  `PAGESPEED_API_KEY` Cloudflare secret. Reliable + secure (key never exposed
+  client-side, unlike the hardcoded Places key). Degrades gracefully off the
+  free shared quota until then. See OWNER_TODO #10.
+  - Note for later review: this same "shared Cloudflare secret via Worker proxy"
+    pattern is the *correct* way to add any future shared API key — better than
+    hardcoding it client-side like the Places key (which is extractable and only
+    safe because it's referrer-restricted). Worth migrating the Places key to
+    this pattern eventually too.
 
 ---
 

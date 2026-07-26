@@ -267,6 +267,41 @@ export default {
       }
     }
 
+    // ── GOOGLE PAGESPEED INSIGHTS proxy ────────────────────────────────────
+    // Real Lighthouse performance + Core Web Vitals for the Site Analyzer.
+    // Runs server-side so the API key (PAGESPEED_API_KEY Cloudflare secret)
+    // is shared across ALL users and never exposed client-side. Works keyless
+    // too, but Google's anonymous shared quota is usually exhausted — set the
+    // secret for reliable use (see OWNER_TODO).
+    if (url.pathname === '/pagespeed' && request.method === 'GET') {
+      const target = url.searchParams.get('url');
+      if (!target) return Response.json({ error: 'Missing url' }, { status: 400, headers: cors });
+      try {
+        const key = env.PAGESPEED_API_KEY;
+        const api = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(target)}&category=performance&strategy=mobile${key ? `&key=${key}` : ''}`;
+        const resp = await fetch(api);
+        const data = await resp.json();
+        if (data.error) {
+          const msg = data.error.message || 'PageSpeed error';
+          const quota = /quota|rate limit/i.test(msg);
+          return Response.json({ error: msg, quota: quota && !key }, { status: 400, headers: cors });
+        }
+        const lh = data.lighthouseResult || {}; const au = lh.audits || {};
+        return Response.json({
+          score: Math.round((lh.categories?.performance?.score ?? 0) * 100),
+          metrics: [
+            ['Largest Contentful Paint', 'largest-contentful-paint'],
+            ['Cumulative Layout Shift', 'cumulative-layout-shift'],
+            ['First Contentful Paint', 'first-contentful-paint'],
+            ['Total Blocking Time', 'total-blocking-time'],
+            ['Speed Index', 'speed-index'],
+          ].filter(([, id]) => au[id]?.displayValue).map(([k, id]) => ({ k, v: au[id].displayValue, s: au[id].score })),
+        }, { headers: cors });
+      } catch (e) {
+        return Response.json({ error: e.message }, { status: 500, headers: cors });
+      }
+    }
+
     // ── RESEND: Send Email ─────────────────────────────────────────────────
     if (url.pathname === '/send-email' && request.method === 'POST') {
       const resendKey = env['RUNESCRIPT(RESEND)_API_KEY'];

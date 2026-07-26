@@ -5404,7 +5404,7 @@ function MarketplacePage({toast,user}){
 function SettingsPage({user,onUpdateUser,toast,setProspects,setPitches,setProposals,setInvoices,accentColor,setAccentColor,setScreen}){
   const[name,setName]=useState(user?.name||'');
   const[email,setEmail]=useState(user?.email||'');
-  const[keys,setKeys]=useState({github:'',netlify:'',stripe:'',places:'AIzaSyA-mPZjkn4fohWEedTC6NOjI7T2X5Dge8A',pagespeed:''});
+  const[keys,setKeys]=useState({github:'',netlify:'',stripe:'',places:'AIzaSyA-mPZjkn4fohWEedTC6NOjI7T2X5Dge8A'});
   const[autoRedirect,setAutoRedirect]=useState(false);
   const[devCode,setDevCode]=useState('');
   const[devUnlocked,setDevUnlocked]=useState(false);
@@ -5414,7 +5414,7 @@ function SettingsPage({user,onUpdateUser,toast,setProspects,setPitches,setPropos
 
   useEffect(()=>{
     window.storage.get('rs3_autoredirect').then(r=>{if(r)setAutoRedirect(r.value==='true');}).catch(()=>{});
-    ['github','netlify','stripe','places','pagespeed'].forEach(k=>{
+    ['github','netlify','stripe','places'].forEach(k=>{
       window.storage.get(`rs3_${k}_key`).then(r=>{if(r)setKeys(prev=>({...prev,[k]:r.value}));}).catch(()=>{});
     });
   },[]);
@@ -5465,7 +5465,6 @@ function SettingsPage({user,onUpdateUser,toast,setProspects,setPitches,setPropos
               {key:'netlify',label:'Netlify Access Token',placeholder:'nfp_xxxxxxxxxxxx'},
               {key:'stripe',label:'Stripe Secret Key',placeholder:'sk_live_xxxxxxxxxxxx'},
               {key:'places',label:'Google Places API Key',placeholder:'AIzaSy...'},
-              {key:'pagespeed',label:'Google PageSpeed API Key (for the Site Analyzer speed test)',placeholder:'AIzaSy...'},
             ].map(k=>(
               <div key={k.key} className="field" style={{margin:0}}>
                 <label>{k.label}</label>
@@ -8149,10 +8148,10 @@ function CompetitorAnalyzerPage({toast}) {
   const [speed, setSpeed] = useState(null);
   const [speedLoading, setSpeedLoading] = useState(false);
 
-  // Real speed measurement via Google PageSpeed Insights (Lighthouse) — actual
-  // performance score + Core Web Vitals, not an AI estimate. Public API,
-  // CORS-enabled, works without a key at low volume (a PageSpeed API key in
-  // Settings would raise the rate limit — optional, see OWNER_TODO).
+  // Real speed measurement via the Worker's /pagespeed proxy (Google
+  // Lighthouse) — actual performance score + Core Web Vitals, not an AI
+  // estimate. Routed through the Worker so the PageSpeed API key lives as a
+  // shared Cloudflare secret (works for ALL users, key never exposed).
   const checkSpeed = async () => {
     let u = url.trim();
     if (!u) { toast('Enter a website URL first.', 'error'); return; }
@@ -8160,26 +8159,15 @@ function CompetitorAnalyzerPage({toast}) {
     if (!/\.[a-z]{2,}/i.test(u)) { toast('That does not look like a full website URL.', 'error'); return; }
     setSpeedLoading(true); setSpeed(null);
     try {
-      let key = '';
-      try { const r = await window.storage.get('rs3_pagespeed_key'); if (r?.value) key = r.value; } catch(e) {}
-      const resp = await fetch(`https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(u)}&category=performance&strategy=mobile${key?`&key=${key}`:''}`);
+      const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
+      const resp = await fetch(`${workerUrl}/pagespeed?url=${encodeURIComponent(u)}`);
       const data = await resp.json();
       if (data.error) {
-        const msg = data.error.message || '';
-        if (/quota|rate limit/i.test(msg) && !key) throw new Error('Google’s free shared quota is used up for today. Add a PageSpeed API key in Settings for reliable, unlimited tests.');
-        throw new Error(msg || 'PageSpeed could not analyze that URL');
+        if (data.quota) throw new Error('Google’s free shared quota is used up. Add a PageSpeed API key as a Cloudflare secret for reliable tests (see OWNER_TODO).');
+        throw new Error(data.error || 'PageSpeed could not analyze that URL');
       }
-      const lh = data.lighthouseResult; const a = lh?.audits || {};
-      const score = Math.round((lh?.categories?.performance?.score ?? 0) * 100);
-      const metrics = [
-        {k:'Largest Contentful Paint', a:a['largest-contentful-paint']},
-        {k:'Cumulative Layout Shift', a:a['cumulative-layout-shift']},
-        {k:'First Contentful Paint', a:a['first-contentful-paint']},
-        {k:'Total Blocking Time', a:a['total-blocking-time']},
-        {k:'Speed Index', a:a['speed-index']},
-      ].filter(m=>m.a?.displayValue).map(m=>({k:m.k, v:m.a.displayValue, s:m.a.score}));
-      setSpeed({ score, metrics, testedUrl: u });
-      toast(`Real speed test done — score ${score}/100.`, 'success');
+      setSpeed({ score: data.score, metrics: data.metrics || [], testedUrl: u });
+      toast(`Real speed test done — score ${data.score}/100.`, 'success');
     } catch(e) { toast('Speed test failed: ' + (e.message || 'try a full URL like example.com'), 'error'); }
     setSpeedLoading(false);
   };
