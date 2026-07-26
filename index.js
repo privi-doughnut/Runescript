@@ -276,12 +276,19 @@ export default {
       const base = (url.searchParams.get('base') || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
       if (!base) return Response.json({ error: 'Missing base' }, { status: 400, headers: cors });
       const tlds = ['.com', '.net', '.org', '.co', '.io', '.app', '.dev', '.design'];
+      // Uses Cloudflare's own DNS-over-HTTPS (no redirects, fast, reliable from
+      // a Worker). NXDOMAIN (Status 3) means the domain isn't registered =>
+      // available. NOERROR with NS records => registered => taken. Anything
+      // ambiguous (registered but no nameservers, SERVFAIL) => null, shown
+      // honestly as "couldn't check".
       const checkOne = async (domain) => {
         try {
-          const r = await fetch(`https://rdap.org/domain/${domain}`, { redirect: 'follow' });
-          if (r.status === 404) return { domain, available: true };
-          if (r.status === 200) return { domain, available: false };
-          return { domain, available: null }; // unknown (TLD without RDAP, rate limit, etc.)
+          const r = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=NS`, { headers: { accept: 'application/dns-json' } });
+          if (!r.ok) return { domain, available: null };
+          const d = await r.json();
+          if (d.Status === 3) return { domain, available: true };           // NXDOMAIN => not registered
+          if (d.Status === 0 && Array.isArray(d.Answer) && d.Answer.some(a => a.type === 2)) return { domain, available: false }; // has NS => registered
+          return { domain, available: null };
         } catch (e) { return { domain, available: null }; }
       };
       try {
