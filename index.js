@@ -267,6 +267,31 @@ export default {
       }
     }
 
+    // ── DOMAIN AVAILABILITY (real, via RDAP) ───────────────────────────────
+    // RDAP is the modern, free, keyless WHOIS replacement. A 404 means the
+    // domain isn't registered (available); 200 means it's taken. No API key,
+    // no fabrication — real registration status. Runs server-side to avoid
+    // browser CORS and follow RDAP redirects.
+    if (url.pathname === '/domain-check' && request.method === 'GET') {
+      const base = (url.searchParams.get('base') || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+      if (!base) return Response.json({ error: 'Missing base' }, { status: 400, headers: cors });
+      const tlds = ['.com', '.net', '.org', '.co', '.io', '.app', '.dev', '.design'];
+      const checkOne = async (domain) => {
+        try {
+          const r = await fetch(`https://rdap.org/domain/${domain}`, { redirect: 'follow' });
+          if (r.status === 404) return { domain, available: true };
+          if (r.status === 200) return { domain, available: false };
+          return { domain, available: null }; // unknown (TLD without RDAP, rate limit, etc.)
+        } catch (e) { return { domain, available: null }; }
+      };
+      try {
+        const results = await Promise.all(tlds.map(t => checkOne(base + t)));
+        return Response.json({ results }, { headers: cors });
+      } catch (e) {
+        return Response.json({ error: e.message }, { status: 500, headers: cors });
+      }
+    }
+
     // ── GOOGLE PAGESPEED INSIGHTS proxy ────────────────────────────────────
     // Real Lighthouse performance + Core Web Vitals for the Site Analyzer.
     // Runs server-side so the API key (PAGESPEED_API_KEY Cloudflare secret)

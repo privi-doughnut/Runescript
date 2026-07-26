@@ -5768,48 +5768,42 @@ function DomainsPage({toast}) {
   const [transferDomain, setTransferDomain] = useState('');
   const [transferCode, setTransferCode] = useState('');
   const [dnsRecords, setDnsRecords] = useState([
-    {type:'A', name:'@', value:'76.76.21.21', ttl:'Auto'},
-    {type:'CNAME', name:'www', value:'your-site.netlify.app', ttl:'Auto'},
-    {type:'MX', name:'@', value:'mail.runescript.app', ttl:'Auto'},
+    {type:'A', name:'@', value:'(your host’s IP address)', ttl:'Auto'},
+    {type:'CNAME', name:'www', value:'(your site’s domain)', ttl:'Auto'},
+    {type:'TXT', name:'@', value:'(verification record, if your host gives one)', ttl:'Auto'},
   ]);
 
+  // Real availability via the Worker's RDAP proxy — no fabricated "available"
+  // results. A domain is genuinely available (unregistered), taken, or its
+  // TLD couldn't be checked (shown honestly as "couldn't check").
   const searchDomains = async () => {
     if(!query.trim()){toast('Enter a domain name.','error');return;}
-    setSearching(true);
+    setSearching(true);setResults([]);
     try {
       const base = query.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
-      const tlds = ['.com','.app','.io','.co','.net','.design','.agency','.studio'];
-      const prompt = `Generate domain availability results for "${base}" across these TLDs: ${tlds.join(', ')}. Return ONLY JSON array: [{"domain":"example.com","available":true,"price":12},{"domain":"example.io","available":false,"price":39},...] Make it realistic - .com often taken, .app and .io available.`;
-      const raw = await callClaude(prompt, 800);
-      const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
-      setResults(parsed);
+      const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
+      const resp = await fetch(`${workerUrl}/domain-check?base=${encodeURIComponent(base)}`);
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error);
+      setResults(data.results || []);
     } catch(e) {
-      const base = query.toLowerCase().replace(/\s+/g,'-');
-      setResults([
-        {domain:`${base}.com`,available:false,price:12},
-        {domain:`${base}.app`,available:true,price:14},
-        {domain:`${base}.io`,available:true,price:39},
-        {domain:`${base}.co`,available:true,price:29},
-        {domain:`${base}.design`,available:true,price:49},
-        {domain:`${base}.agency`,available:true,price:35},
-      ]);
+      toast('Domain check failed — try again.','error');
     }
     setSearching(false);
   };
 
-  const buyDomain = (domain, price) => {
-    setOwned(prev=>[...prev,{domain,price,expires:'2027-06-12',status:'Active',registrar:'Namecheap',dns:dnsRecords}]);
-    setResults(prev=>prev.map(r=>r.domain===domain?{...r,available:false,owned:true}:r));
-    toast(`${domain} registered! Configure DNS below.`,'success');
-    setTab('manage');
+  // Real registration happens at a registrar — we don't fake it. Opens a real
+  // Namecheap search for the exact domain so the user completes it there.
+  const registerDomain = (domain) => {
+    window.open(`https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(domain)}`,'_blank');
   };
 
+  // Real transfers happen at the registrar with your auth/EPP code — we don't
+  // fake it. Opens Namecheap's transfer page prefilled with the domain.
   const startTransfer = () => {
-    if(!transferDomain||!transferCode){toast('Enter domain and auth code.','error');return;}
-    setOwned(prev=>[...prev,{domain:transferDomain,price:0,expires:'2027-12-01',status:'Transferring',registrar:'Transfer',dns:[]}]);
-    setTransferDomain('');setTransferCode('');
-    toast(`Transfer initiated for ${transferDomain}. Usually takes 5-7 days.`,'info');
-    setTab('manage');
+    if(!transferDomain.trim()){toast('Enter the domain you want to transfer.','error');return;}
+    window.open(`https://www.namecheap.com/domains/transfer/?domain=${encodeURIComponent(transferDomain.trim())}`,'_blank');
+    toast('Opening the transfer page at Namecheap — you will need your auth (EPP) code from your current registrar.','info');
   };
 
   return (
@@ -5837,15 +5831,13 @@ function DomainsPage({toast}) {
               {results.map((r,i)=>(
                 <div key={i} className="domain-result">
                   <div className="domain-result-name">{r.domain}</div>
-                  <span className={`domain-result-status ${r.available?'domain-status-avail':'domain-status-taken'}`}>
-                    {r.owned?'Owned':r.available?'Available':'Taken'}
+                  <span className={`domain-result-status ${r.available===true?'domain-status-avail':r.available===false?'domain-status-taken':''}`} style={r.available===null?{color:'#5a5868'}:undefined}>
+                    {r.available===true?'Available':r.available===false?'Taken':'Couldn’t check'}
                   </span>
-                  <div className="domain-result-price">{r.available&&!r.owned?`$${r.price}/yr`:''}</div>
-                  {r.available&&!r.owned && (
-                    <button className="btn btn-gold btn-sm" onClick={()=>buyDomain(r.domain,r.price)}>Buy</button>
-                  )}
-                  {!r.available&&!r.owned && <button className="btn btn-ghost btn-sm" disabled>Taken</button>}
-                  {r.owned && <span className="badge b-green">Yours</span>}
+                  <div className="domain-result-price"></div>
+                  {r.available===true && <button className="btn btn-gold btn-sm" onClick={()=>registerDomain(r.domain)}>Register →</button>}
+                  {r.available===false && <button className="btn btn-ghost btn-sm" disabled>Taken</button>}
+                  {r.available===null && <a href={`https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(r.domain)}`} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm">Check at registrar ↗</a>}
                 </div>
               ))}
             </div>
@@ -5884,7 +5876,7 @@ function DomainsPage({toast}) {
       {tab==='manage' && (
         <>
           {owned.length===0?(
-            <div className="empty"><div className="empty-rune">ᛜ</div><div className="empty-title">No domains yet</div><div className="empty-sub">Search and buy a domain, or transfer an existing one.</div></div>
+            <div className="empty"><div className="empty-rune">ᛜ</div><div className="empty-title">Manage your domain’s DNS</div><div className="empty-sub">Register a domain from the Search tab (opens your registrar), then use the DNS tab as a reference for the records to point it at your site.</div><button className="btn btn-gold btn-sm" onClick={()=>setTab('dns')}>Open DNS Guide →</button></div>
           ):(
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {owned.map((d,i)=>(
@@ -5896,8 +5888,7 @@ function DomainsPage({toast}) {
                     </div>
                   </div>
                   <span className={`badge ${d.status==='Active'?'b-green':'b-blue'}`}>{d.status}</span>
-                  <button className="btn btn-ghost btn-sm" onClick={()=>{setTab('dns');toast('Managing DNS for '+d.domain,'info');}}>Manage DNS</button>
-                  <button className="btn btn-gold btn-sm" onClick={()=>toast(`${d.domain} connected to your Netlify site.`,'success')}>Connect Site</button>
+                  <button className="btn btn-ghost btn-sm" onClick={()=>setTab('dns')}>DNS Guide</button>
                 </div>
               ))}
             </div>
@@ -5907,8 +5898,8 @@ function DomainsPage({toast}) {
 
       {tab==='dns' && (
         <div className="domain-section">
-          <div className="domain-section-title">DNS Records</div>
-          <div className="domain-section-sub">Edit your DNS configuration — changes take up to 48 hours to propagate</div>
+          <div className="domain-section-title">DNS Records — Reference Guide</div>
+          <div className="domain-section-sub">Plan the records to set at your registrar or DNS host to point a domain at your site. This is a planning reference — edits here are notes for you, not live DNS. Your host will give you the exact values.</div>
           <table className="dns-table">
             <thead><tr><th>Type</th><th>Name</th><th>Value / Points To</th><th>TTL</th><th/></tr></thead>
             <tbody>
@@ -5925,7 +5916,7 @@ function DomainsPage({toast}) {
           </table>
           <div style={{display:'flex',gap:8,marginTop:12}}>
             <button className="btn btn-ghost btn-sm" onClick={()=>setDnsRecords(prev=>[...prev,{type:'A',name:'',value:'',ttl:'Auto'}])}>+ Add Record</button>
-            <button className="btn btn-gold btn-sm" onClick={()=>toast('DNS records saved.','success')}>Save Changes</button>
+            <button className="btn btn-gold btn-sm" onClick={()=>{const txt=dnsRecords.map(r=>`${r.type}\t${r.name}\t${r.value}\t${r.ttl}`).join('\n');navigator.clipboard.writeText('Type\tName\tValue\tTTL\n'+txt);toast('DNS records copied — paste them at your registrar.','success');}}>Copy Records</button>
           </div>
         </div>
       )}
