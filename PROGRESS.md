@@ -38,6 +38,13 @@ _Last updated: 2026-07-24 (fifth session — roadmap audit, SQL activated, hones
     in the sidebar with NO render branch (showed blank when clicked).
   - PageSpeed refactored to route through the Worker (shared Cloudflare
     secret) so it works for ALL users, not per-browser (see owner items).
+  - **Domains page de-fabricated** — it faked availability AND faked
+    domain purchases/transfers ("registered!" with nothing happening),
+    worse than the scanner issue. Now: real availability via a Worker
+    /domain-check RDAP endpoint (free, keyless — 404=available, 200=taken);
+    Register/Transfer open the real registrar (Namecheap); DNS reframed as
+    an honest reference guide. 4 more client-site sections (Coupon, Gift
+    Card, Courses, Portfolio) → 24 sections total.
   - Confirmed client code export already existed (Download All / Clone / per-page).
   - Fixed real bugs: CRM Table-view rows didn't open the detail drawer;
     the "17 tools" claim was false (only 7 reachable); Contracts + Onboarding
