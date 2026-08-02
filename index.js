@@ -342,6 +342,21 @@ export default {
           return Response.json({ error: msg, quota: quota && !key }, { status: 400, headers: cors });
         }
         const lh = data.lighthouseResult || {}; const au = lh.audits || {};
+        // Opportunities = the real, actionable fixes Lighthouse measured for
+        // THIS page (render-blocking JS, oversized images, unused CSS, etc.),
+        // each with a measured time saving. Not guessed — straight from the
+        // audit. We surface any audit that either is an "opportunity" type or
+        // reports a real byte/ms saving, and that didn't already pass.
+        const opportunities = Object.values(au)
+          .filter(a => a && a.title && a.score !== 1 && (a.details?.type === 'opportunity' || a.details?.overallSavingsMs > 0 || a.details?.overallSavingsBytes > 0))
+          .map(a => ({
+            title: a.title,
+            desc: (a.description || '').replace(/\s*\[.*?\]\(.*?\)/g, '').trim(), // strip markdown doc links
+            display: a.displayValue || '',
+            savingsMs: Math.round(a.details?.overallSavingsMs || 0),
+          }))
+          .sort((x, y) => y.savingsMs - x.savingsMs)
+          .slice(0, 12);
         return Response.json({
           score: Math.round((lh.categories?.performance?.score ?? 0) * 100),
           metrics: [
@@ -351,6 +366,7 @@ export default {
             ['Total Blocking Time', 'total-blocking-time'],
             ['Speed Index', 'speed-index'],
           ].filter(([, id]) => au[id]?.displayValue).map(([k, id]) => ({ k, v: au[id].displayValue, s: au[id].score })),
+          opportunities,
         }, { headers: cors });
       } catch (e) {
         return Response.json({ error: e.message }, { status: 500, headers: cors });

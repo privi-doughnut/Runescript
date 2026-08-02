@@ -8200,6 +8200,8 @@ function CompetitorAnalyzerPage({toast}) {
   const [analysis, setAnalysis] = useState(null);
   const [speed, setSpeed] = useState(null);
   const [speedLoading, setSpeedLoading] = useState(false);
+  const [fixPlan, setFixPlan] = useState(null);
+  const [fixLoading, setFixLoading] = useState(false);
 
   // Real speed measurement via the Worker's /pagespeed proxy (Google
   // Lighthouse) — actual performance score + Core Web Vitals, not an AI
@@ -8210,7 +8212,7 @@ function CompetitorAnalyzerPage({toast}) {
     if (!u) { toast('Enter a website URL first.', 'error'); return; }
     if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
     if (!/\.[a-z]{2,}/i.test(u)) { toast('That does not look like a full website URL.', 'error'); return; }
-    setSpeedLoading(true); setSpeed(null);
+    setSpeedLoading(true); setSpeed(null); setFixPlan(null);
     try {
       const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
       const resp = await fetch(`${workerUrl}/pagespeed?url=${encodeURIComponent(u)}`);
@@ -8219,12 +8221,35 @@ function CompetitorAnalyzerPage({toast}) {
         if (data.quota) throw new Error('Google’s free shared quota is used up. Add a PageSpeed API key as a Cloudflare secret for reliable tests (see OWNER_TODO).');
         throw new Error(data.error || 'PageSpeed could not analyze that URL');
       }
-      setSpeed({ score: data.score, metrics: data.metrics || [], testedUrl: u });
+      setSpeed({ score: data.score, metrics: data.metrics || [], opportunities: data.opportunities || [], testedUrl: u });
       toast(`Real speed test done — score ${data.score}/100.`, 'success');
     } catch(e) { toast('Speed test failed: ' + (e.message || 'try a full URL like example.com'), 'error'); }
     setSpeedLoading(false);
   };
   const metricColor = s => s==null ? '#5a5868' : s>=0.9 ? '#7ac89a' : s>=0.5 ? '#c9a84c' : '#e07878';
+
+  // Speed Optimizer: the *problems* below are measured by Google Lighthouse
+  // (real, not guessed). This only asks the AI to explain HOW to fix each
+  // measured issue — concrete remediation steps a developer can act on.
+  const getFixPlan = async () => {
+    if (!speed?.opportunities?.length) { toast('Run a speed test first — no measured issues to fix.', 'error'); return; }
+    setFixLoading(true);
+    try {
+      const list = speed.opportunities.map((o,i)=>`${i+1}. ${o.title}${o.display?` (${o.display})`:''}${o.savingsMs?` — est. ${(o.savingsMs/1000).toFixed(1)}s saving`:''}`).join('\n');
+      const prompt = `A website (${speed.testedUrl}) scored ${speed.score}/100 on Google Lighthouse (mobile). These are the REAL optimization opportunities Lighthouse measured, most impactful first:
+${list}
+
+For each one, give a concrete, specific fix a web developer can implement. Return ONLY valid JSON in this exact shape:
+{"fixes":[{"issue":"<the issue title>","how":"<2-3 sentence concrete fix — specific techniques/tools, not vague advice>","effort":"low"}]}
+effort is one of "low","medium","high". Keep the same order. Do not invent issues that are not in the list.`;
+      const raw = await callClaude(prompt, 2000);
+      const parsed = JSON.parse(raw.replace(/```json|```/g,'').trim());
+      setFixPlan(parsed.fixes || []);
+      toast('Fix plan ready.', 'success');
+    } catch(e) { toast('Could not draft the fix plan. Try again.', 'error'); }
+    setFixLoading(false);
+  };
+  const effortColor = e => e==='low' ? '#7ac89a' : e==='medium' ? '#c9a84c' : '#e07878';
 
   const analyze = async () => {
     if (!url.trim()) { toast('Enter a URL or business name.', 'error'); return; }
@@ -8304,6 +8329,47 @@ Return ONLY valid JSON.`;
             ))}
           </div>
           <div style={{fontSize:'.7rem',color:'#3a3848',marginTop:10,lineHeight:1.6}}>Green = good, gold = needs work, red = poor. A low score here is real, hard evidence to open your pitch with.</div>
+
+          {speed.opportunities&&speed.opportunities.length>0&&(
+            <div style={{marginTop:16,borderTop:'1px solid rgba(201,168,76,.08)',paddingTop:14}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:10}}>
+                <div>
+                  <div style={{fontFamily:"'Cinzel',serif",fontSize:'.9rem',fontWeight:700,color:'#ddd8ce'}}>Optimization Opportunities</div>
+                  <div style={{fontSize:'.66rem',color:'#5a5868',marginTop:2}}>Measured by Google Lighthouse — the real fixes that would speed this page up, biggest impact first.</div>
+                </div>
+                <button className="btn btn-gold btn-sm" onClick={getFixPlan} disabled={fixLoading}>{fixLoading?<><Spinner/>Drafting…</>:'🔧 Get the fix plan'}</button>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                {speed.opportunities.map((o,i)=>(
+                  <div key={i} style={{display:'flex',alignItems:'flex-start',gap:10,padding:'8px 10px',background:'rgba(201,168,76,.03)',border:'1px solid rgba(201,168,76,.06)'}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:'.78rem',color:'#ddd8ce',fontWeight:600}}>{o.title}</div>
+                      {o.desc&&<div style={{fontSize:'.66rem',color:'#5a5868',marginTop:2,lineHeight:1.5}}>{o.desc}</div>}
+                    </div>
+                    {(o.savingsMs>0||o.display)&&<div style={{flexShrink:0,textAlign:'right'}}><div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:'.8rem',fontWeight:700,color:o.savingsMs>=1000?'#e07878':'#c9a84c'}}>{o.savingsMs>0?`-${(o.savingsMs/1000).toFixed(1)}s`:o.display}</div>{o.savingsMs>0&&o.display&&o.display!==`-${(o.savingsMs/1000).toFixed(1)}s`&&<div style={{fontSize:'.58rem',color:'#3a3848'}}>{o.display}</div>}</div>}
+                  </div>
+                ))}
+              </div>
+
+              {fixPlan&&fixPlan.length>0&&(
+                <div style={{marginTop:14}}>
+                  <div style={{fontFamily:"'Cinzel',serif",fontSize:'.82rem',fontWeight:700,color:'#c9a84c',marginBottom:8}}>How to fix each one</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                    {fixPlan.map((f,i)=>(
+                      <div key={i} style={{padding:'10px 12px',background:'rgba(201,168,76,.04)',borderLeft:`3px solid ${effortColor(f.effort)}`}}>
+                        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
+                          <span style={{fontSize:'.78rem',color:'#ddd8ce',fontWeight:600}}>{f.issue}</span>
+                          <span style={{fontSize:'.56rem',textTransform:'uppercase',letterSpacing:'1px',color:effortColor(f.effort),border:`1px solid ${effortColor(f.effort)}`,borderRadius:3,padding:'1px 6px'}}>{f.effort} effort</span>
+                        </div>
+                        <div style={{fontSize:'.72rem',color:'#8a8898',lineHeight:1.6}}>{f.how}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{fontSize:'.64rem',color:'#3a3848',marginTop:8,lineHeight:1.6}}>The issues above are measured by Google; these fix steps are AI-drafted guidance — verify before implementing on a client site.</div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
