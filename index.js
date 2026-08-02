@@ -14,8 +14,31 @@ function corsHeaders(origin) {
   return {
     'Access-Control-Allow-Origin': allowed,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
+}
+
+// Supabase project the app authenticates against. The anon key is PUBLIC by
+// design (it only grants what RLS allows) — safe to hardcode in the Worker.
+const SUPABASE_AUTH_URL = 'https://ydxshxiemmdygumddzyx.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkeHNoeGllbW1keWd1bWRkenl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0Nzc0MzYsImV4cCI6MjA5ODA1MzQzNn0.Huaa2WXjKu5LLHacQVoa3Ya_P5WvbbDe7kKdQUhgDYw';
+
+// Verifies the caller is a real logged-in user by validating their Supabase
+// access token against Supabase Auth. This gates the cost-bearing endpoints
+// (Claude proxy, Resend) so a stranger can't drain the API keys — CORS alone
+// does NOT stop non-browser requests. Returns true if the token maps to a user.
+async function verifySupabaseUser(request) {
+  const auth = request.headers.get('Authorization') || '';
+  const token = auth.replace(/^Bearer\s+/i, '').trim();
+  if (!token) return false;
+  try {
+    const r = await fetch(`${SUPABASE_AUTH_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) return false;
+    const u = await r.json();
+    return !!(u && u.id);
+  } catch (e) { return false; }
 }
 
 // Maps each tier to the Cloudflare secret name holding its Stripe price ID.
@@ -336,6 +359,11 @@ export default {
 
     // ── RESEND: Send Email ─────────────────────────────────────────────────
     if (url.pathname === '/send-email' && request.method === 'POST') {
+      // Gated: only a logged-in user can send mail, so a stranger can't abuse
+      // the Resend account for spam (which would also wreck sender reputation).
+      if (!(await verifySupabaseUser(request))) {
+        return Response.json({ error: 'Sign in required.' }, { status: 401, headers: cors });
+      }
       const resendKey = env['RUNESCRIPT(RESEND)_API_KEY'];
       if (!resendKey) {
         return Response.json({ error: 'Resend not configured' }, { status: 500, headers: cors });
@@ -456,6 +484,11 @@ export default {
     // Builder, all route through this one endpoint). Moved to a path that
     // can't collide with a static file.
     if (url.pathname === '/api/claude' && request.method === 'POST') {
+      // Gated: only a logged-in user can use the AI proxy, so a stranger
+      // can't drain the Anthropic key by hitting this endpoint directly.
+      if (!(await verifySupabaseUser(request))) {
+        return Response.json({ error: 'Sign in to use AI features.' }, { status: 401, headers: cors });
+      }
       const anthropicKey = env.RUNESCRIPT_API_KEY;
       if (!anthropicKey) {
         return Response.json({ error: 'API key not configured' }, { status: 500, headers: cors });

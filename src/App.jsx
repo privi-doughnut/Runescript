@@ -276,11 +276,21 @@ Warm regards,
   default: `This is a mock AI response for testing purposes. Mock API mode is active — no credits are being used. In production mode, this would be a real Claude response tailored to your specific prompt.`,
 };
 
+// Attaches the logged-in user's Supabase access token so the Worker can verify
+// the caller before spending on Anthropic/Resend. The gated endpoints reject
+// requests without a valid token.
+const authHeaders = async () => {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+  } catch (e) { return {}; }
+};
+
 const sendEmail = async ({to, subject, html, from}) => {
   const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
   const resp = await fetch(`${workerUrl}/send-email`, {
     method: 'POST',
-    headers: {'Content-Type':'application/json'},
+    headers: {'Content-Type':'application/json', ...(await authHeaders())},
     body: JSON.stringify({to, subject, html, from}),
   });
   const data = await resp.json();
@@ -411,7 +421,7 @@ const callClaude = async (prompt, max=1400) => {
   }
   const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
   const r = await fetch(`${workerUrl}/api/claude`,{
-    method:'POST', headers:{'Content-Type':'application/json'},
+    method:'POST', headers:{'Content-Type':'application/json', ...(await authHeaders())},
     body:JSON.stringify({max_tokens:max,messages:[{role:'user',content:prompt}]})
   });
   const data = await r.json();
