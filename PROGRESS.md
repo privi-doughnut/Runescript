@@ -1,6 +1,85 @@
 # Rune Script — Progress Report
 
-_Last updated: 2026-07-24 (fifth session — roadmap audit, SQL activated, honesty pass on stats + pricing)_
+_Last updated: 2026-08-02 (sixth session — security hardening pass, verified live)_
+
+---
+
+## Sixth session (2026-08-02): security hardening
+
+Motivated by the owner wanting the app to withstand "people who'd destroy a
+vibe-coded app" — closing the holes that class of attacker looks for first.
+
+**Shipped, pushed, and verified live:**
+
+- **Open AI proxy closed (was the #1 hole).** `/api/claude` was unauthenticated —
+  anyone could `curl` it and burn the Anthropic key (real money). Now the Worker
+  verifies the caller's Supabase access token (`verifySupabaseUser`) before
+  spending; returns `401 {"error":"Sign in to use AI features."}` otherwise.
+  **CORS does not stop this** — CORS only restricts browsers; a script ignores it.
+  Verified live: no-auth → 401; a real signed-up user's token → Claude replies
+  normally. Every AI feature still works for real users.
+- **Open email endpoint closed.** `/send-email` (Resend) had the same problem
+  (spam + sender-reputation risk). Same token gating, same verified path.
+- **Affiliate `payout_email` PII leak fixed.** The `affiliates` RLS was
+  `select using(true)`, exposing every user's payout email to every logged-in
+  user. Now own-row-only; `?ref=` signup attribution goes through a
+  `security definer` function (`resolve_affiliate_id`) that returns *only* the
+  user id, never the email. **Owner re-ran `SUPABASE_FINAL.sql` — this fix is
+  now live.**
+- **Frontend plumbing:** added `authHeaders()`; `callClaude` and `sendEmail`
+  attach the logged-in user's token.
+- **`SECURITY.md` added** — full audit: fixed items, verified-safe list (RLS on
+  all 10 tables, no injection surface, no committed secrets, preview iframe is
+  self-XSS-only), threat model, and the owner follow-ups below.
+
+### Owner-action items noted this session (defense-in-depth — not blocking)
+
+These two are **not urgent** and change no behavior for users — they raise the
+floor against abuse. Detailed steps so they can be done later without re-deriving.
+
+**A. Cloudflare rate-limiting on the ungated endpoints (MEDIUM, ~10 min).**
+Some Worker endpoints must stay open because *customers' own deployed sites* call
+them cross-origin — they can't be locked to the app's login. These are the
+Stripe-session endpoints (`/create-trial-checkout`, `/create-invoice-payment`,
+`/create-template-checkout`, `/check-session/`), plus `/pagespeed` and
+`/domain-check` (cheap, keyless-ish, but abusable in bulk). The right protection
+for these is a rate limit, not auth.
+  1. Cloudflare dashboard → your account → the `runescript` Worker's zone, or
+     Security → **WAF** → **Rate limiting rules** → *Create rule*.
+  2. Rule 1 (money endpoints): if URI Path **starts with** `/create-` →
+     when rate exceeds **~20 requests per 1 minute per IP** → **Block** for
+     ~1 minute. (Legit customers click "buy" a handful of times, never 20/min.)
+  3. Rule 2 (utility endpoints): URI Path **equals** `/pagespeed` **or**
+     `/domain-check` → **~30 requests per 1 minute per IP** → **Block**.
+  4. Leave the app's own same-origin/auth-gated routes alone — those are already
+     protected by the login gating shipped this session.
+  Effect: stops brute/scripted abuse of the open endpoints with zero code change
+  and no impact on real usage.
+
+**B. Confirm the Google Places API key is HTTP-referrer-restricted (MEDIUM, ~5 min).**
+The Places key is hardcoded in the client bundle (unavoidable — it's a
+browser-side Places call) so anyone can extract it from devtools. Its *only* real
+protection is a Google-side restriction that rejects requests from domains that
+aren't yours.
+  1. Google Cloud Console → **APIs & Services** → **Credentials** → click the
+     Places/Maps API key.
+  2. Under **Application restrictions**, confirm **HTTP referrers (web sites)**
+     is selected (not "None").
+  3. Under **Website restrictions**, confirm these are present (add any missing):
+     `https://runescript.its-the-prithivi-show.workers.dev/*` and, if/when a
+     custom domain is added, that domain's `/*` too. (The old
+     `runescript.netlify.app/*` can stay or go.)
+  4. Under **API restrictions**, ideally restrict the key to just the
+     Places/Maps APIs it actually uses, not "Don't restrict key".
+  If it's already referrer-restricted (the fourth-session notes say the owner set
+  this for the Cloudflare domain), this is just a confirmation — nothing to do.
+  Better long-term (optional, a real build): move Places behind a Worker proxy
+  with the key as a Cloudflare secret, exactly like `/pagespeed` and
+  `/domain-check` already are — then the key never ships to the browser at all.
+
+See `OWNER_TODO.md` #12 and #13 for the same two items, and `SECURITY.md` for the
+full audit and remaining lower-priority follow-ups (marketplace HTML world-read,
+`feature_requests` permissiveness).
 
 ---
 

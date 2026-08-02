@@ -85,3 +85,27 @@ usually exhausted (errors "quota exceeded"). Degrades gracefully — shows a cle
 - If you want the e-commerce Shop section to work on a customer's own deployed domain, add their domain to `ALLOWED_ORIGINS` in `index.js` — deliberately left alone this session since it's a production CORS/security setting. Note this list currently still only has the old `runescript.netlify.app`/`*.netlify.app` — worth adding `runescript.its-the-prithivi-show.workers.dev` too if any customer-facing flow ever calls the API cross-origin from a *different* origin than the one serving the app itself (same-origin calls, which is most of the app now that frontend+API are one deploy, don't need CORS at all).
 - Capacitor mobile wrapper is scaffolded on branch `capacitor-mobile-wrapper` (unmerged, and now meaningfully diverged from `main` after this session's changes). Needs Xcode (`npx cap open ios`) or Android Studio (`npx cap open android`) to actually build/test — this environment has neither. If you want to pick this up, expect to redo the merge from `main` first since the branch is stale.
 - Consider a permanent fix for this machine's Node situation (system Node is v11.11.0 from 2019, Homebrew is broken/unrepairable) — every session so far has worked around it with a manual `nvm install 22` + explicit `PATH` export per command, which is fragile. Actually fixing Homebrew, or documenting the nvm path permanently in a shell profile that this harness *does* source, would remove that friction for good.
+
+## 12. (Security, defense-in-depth) Add Cloudflare rate-limiting to the open endpoints
+
+Added 2026-08-02 during the security pass. **Not urgent, changes nothing for users** — it just stops brute/scripted abuse of the endpoints that *have* to stay open (customers' own deployed sites call them cross-origin, so they can't be locked behind the app login). Auth-gating the AI/email endpoints already shipped and is verified live; this is the complementary protection for the endpoints that can't be gated.
+
+Which endpoints: the Stripe-session ones (`/create-trial-checkout`, `/create-invoice-payment`, `/create-template-checkout`, `/check-session/`), plus `/pagespeed` and `/domain-check`.
+
+Steps:
+1. Cloudflare dashboard → Security → **WAF** → **Rate limiting rules** → *Create rule*.
+2. Rule 1 (money endpoints): URI Path **starts with** `/create-` → when rate exceeds **~20 requests / 1 minute / IP** → **Block** ~1 min. (Real buyers click a few times, never 20/min.)
+3. Rule 2 (utility endpoints): URI Path **equals** `/pagespeed` **or** `/domain-check` → **~30 requests / 1 minute / IP** → **Block**.
+4. Don't touch the auth-gated routes — they're already protected by the login gating.
+
+## 13. (Security, defense-in-depth) Confirm the Google Places key is HTTP-referrer-restricted
+
+Added 2026-08-02. The Places key is in the client bundle (unavoidable for a browser-side Places call), so anyone can read it from devtools. Its only real protection is a Google-side referrer restriction. The fourth-session notes say you already set this for the Cloudflare domain — so this is likely just a **confirmation**, ~5 min.
+
+Steps:
+1. Google Cloud Console → **APIs & Services** → **Credentials** → open the Places/Maps API key.
+2. **Application restrictions** → confirm **HTTP referrers (web sites)** is selected (not "None").
+3. **Website restrictions** → confirm `https://runescript.its-the-prithivi-show.workers.dev/*` is listed (add it if not; add any future custom domain's `/*` too). Old `runescript.netlify.app/*` can stay or go.
+4. **API restrictions** → ideally restrict to just the Places/Maps APIs it uses, not "Don't restrict key".
+
+Better long-term (optional real build): proxy Places through the Worker with the key as a Cloudflare secret — like `/pagespeed` and `/domain-check` already are — so the key never reaches the browser. Not needed if the referrer restriction is in place.
