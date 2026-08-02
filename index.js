@@ -351,7 +351,7 @@ export default {
           .filter(a => a && a.title && a.score !== 1 && (a.details?.type === 'opportunity' || a.details?.overallSavingsMs > 0 || a.details?.overallSavingsBytes > 0))
           .map(a => ({
             title: a.title,
-            desc: (a.description || '').replace(/\s*\[.*?\]\(.*?\)/g, '').trim(), // strip markdown doc links
+            desc: (a.description || '').replace(/\s*\[.*?\]\(.*?\)/g, '').replace(/\.{2,}/g, '.').replace(/\s+\./g, '.').trim(), // strip markdown doc links + tidy leftover punctuation
             display: a.displayValue || '',
             savingsMs: Math.round(a.details?.overallSavingsMs || 0),
           }))
