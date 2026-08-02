@@ -81,6 +81,30 @@ See `OWNER_TODO.md` #12 and #13 for the same two items, and `SECURITY.md` for th
 full audit and remaining lower-priority follow-ups (marketplace HTML world-read,
 `feature_requests` permissiveness).
 
+### Speed Optimizer built (fulfils a pricing-tier feature with REAL data)
+
+"Speed optimizer" was listed in the Build tier but didn't exist. Built it on top
+of the real PageSpeed/Lighthouse data the Site Analyzer already fetches — no
+fabrication:
+
+- **Worker `/pagespeed`** now also returns `opportunities` — the actual
+  optimization items Lighthouse measured for that page (render-blocking JS,
+  oversized images, unused CSS, etc.), each with its measured time saving.
+  Backward-compatible (score + Core Web Vitals unchanged).
+- **Site Analyzer UI** lists those opportunities biggest-impact-first (real
+  measured savings shown, e.g. "-1.2s"), then a **"Get the fix plan"** button
+  sends the *real measured* issues to Claude for concrete per-issue remediation
+  steps with an effort tag. The AI only explains **how to fix** the measured
+  problems — it does not invent the problems (UI says so explicitly).
+- **Verification:** extraction logic unit-tested against a real-shaped Lighthouse
+  payload (correct filtering of passed/metric audits, correct sort by savings,
+  doc-link + punctuation cleanup) ✓. Compiles clean ✓. The live end-to-end path
+  is currently blocked only by Google's **keyless PageSpeed quota being
+  exhausted** (confirmed live: endpoint is up and returns a clean "quota
+  exceeded" — this is exactly OWNER_TODO #10; setting the `PAGESPEED_API_KEY`
+  Cloudflare secret unblocks it, and it degrades gracefully until then — the
+  opportunities section simply doesn't render if the speed test can't run).
+
 ---
 
 ## Fifth session (2026-07-24/25): SQL activated, honesty pass, Option-C builds
