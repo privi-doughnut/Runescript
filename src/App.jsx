@@ -2128,9 +2128,11 @@ function AuthScreen({onAuth,onBack}) {
           try{
             const refHandle=new URLSearchParams(window.location.search).get('ref');
             if(refHandle){
-              const{data:aff}=await sb.from('affiliates').select('user_id').eq('handle',refHandle.toLowerCase()).maybeSingle();
-              if(aff?.user_id&&aff.user_id!==data.user.id){
-                await sb.from('referrals').insert({referrer_id:aff.user_id,referred_user_id:data.user.id,referred_handle:refHandle.toLowerCase()});
+              // Resolve handle -> referrer id via a security-definer RPC so we
+              // never read the affiliates table directly (it holds payout PII).
+              const{data:refId}=await sb.rpc('resolve_affiliate_id',{h:refHandle.toLowerCase()});
+              if(refId&&refId!==data.user.id){
+                await sb.from('referrals').insert({referrer_id:refId,referred_user_id:data.user.id,referred_handle:refHandle.toLowerCase()});
               }
             }
           }catch(e){}

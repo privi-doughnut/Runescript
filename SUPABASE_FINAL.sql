@@ -238,11 +238,17 @@ drop policy if exists "users manage own affiliate row" on affiliates;
 create policy "users manage own affiliate row" on affiliates
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- Anyone signed in can look up an affiliate by handle (needed to attribute a
--- signup to the right referrer) — but only non-sensitive columns matter here.
+-- SECURITY FIX: the affiliates table holds payout_email (PII). A blanket
+-- "select using (true)" would expose every user's payout email to every other
+-- user. Instead, users can only read their OWN affiliate row (policy above
+-- with FOR ALL covers select). Referral attribution at signup needs to map a
+-- ?ref= handle to a user_id WITHOUT exposing anything else — done via this
+-- security-definer function, which returns only the id.
 drop policy if exists "anyone can look up affiliate handles" on affiliates;
-create policy "anyone can look up affiliate handles" on affiliates
-  for select using (true);
+
+create or replace function resolve_affiliate_id(h text) returns uuid as $$
+  select user_id from affiliates where handle = lower(h) limit 1;
+$$ language sql security definer stable;
 
 drop policy if exists "affiliates view own referrals" on referrals;
 create policy "affiliates view own referrals" on referrals
