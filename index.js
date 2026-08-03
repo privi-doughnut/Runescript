@@ -521,7 +521,12 @@ export default {
           body: JSON.stringify({
             ...body,
             model: 'claude-sonnet-5',
-            max_tokens: Math.min(body.max_tokens || 1400, 8000),
+            // Cap raised to 16000: a full, design-system-compliant HTML page can
+            // exceed 8000 output tokens and was silently truncating (never closing
+            // </html>). claude-sonnet-5's default thinking also spends output
+            // tokens, so complex site builds pass thinking:{type:'disabled'} in the
+            // body (forwarded via ...body above) to reclaim that budget for HTML.
+            max_tokens: Math.min(body.max_tokens || 1400, 16000),
           }),
         });
         const data = await response.json();

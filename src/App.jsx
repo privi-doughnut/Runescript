@@ -528,7 +528,7 @@ const checkStripeSession = async (sessionId) => {
   return data;
 };
 
-const callClaude = async (prompt, max=1400) => {
+const callClaude = async (prompt, max=1400, opts={}) => {
   // Trial credit limit check
   if (!window.MOCK_MODE && window.__trialLimit !== null && window.__trialLimit !== undefined) {
     const used = window.__trialUsed || 0;
@@ -549,7 +549,10 @@ const callClaude = async (prompt, max=1400) => {
   const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
   const r = await fetch(`${workerUrl}/api/claude`,{
     method:'POST', headers:{'Content-Type':'application/json', ...(await authHeaders())},
-    body:JSON.stringify({max_tokens:max,messages:[{role:'user',content:prompt}]})
+    // opts.noThinking disables claude-sonnet-5's default extended thinking, which
+    // otherwise spends output tokens and truncated large HTML builds. Used for
+    // site generation, where the full budget must go to the page itself.
+    body:JSON.stringify({max_tokens:max,messages:[{role:'user',content:prompt}],...(opts.noThinking?{thinking:{type:'disabled'}}:{})})
   });
   const data = await r.json();
   if (data.error) throw new Error(typeof data.error === 'string' ? data.error : (data.error.message || 'AI request failed.'));
@@ -4510,7 +4513,7 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
       ?`${DESIGN_SYSTEM_PROMPT}\n\nNow build a complete, production-quality HTML page for the "${activePage}" section of this website. ${pageHint} Business/context: "${msg}". ${homeCtx} Match the visual style of the home page if provided. Return ONLY complete HTML starting with <!DOCTYPE html>.`
       :`${DESIGN_SYSTEM_PROMPT}\n\nModify the ${activePage} page per this request: "${msg}". Preserve the existing design and hold the same quality bar above (semantic tags, full interactive states, no slop, banned buzzwords). Current HTML: ${(pages[activePage]||'').slice(0,2000)}... Return COMPLETE updated HTML only.`;
     try{
-      const raw=await callClaude(prompt,8000);
+      const raw=await callClaude(prompt,16000,{noThinking:true});
       const html=raw.replace(/```html|```/g,'').trim();
       setPages(p=>({...p,[activePage]:html}));
       setMsgs(m=>({...m,[activePage]:[...(m[activePage]||[]),{role:'ai',text:isFirst?`✦ ${activePage.charAt(0).toUpperCase()+activePage.slice(1)} page built. Ask me to change anything.`:`Updated. Check the preview.`}]}));
