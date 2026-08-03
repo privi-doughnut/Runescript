@@ -285,6 +285,91 @@ create policy "anyone submits feature requests" on feature_requests for insert w
 drop policy if exists "anyone upvotes feature requests" on feature_requests;
 create policy "anyone upvotes feature requests" on feature_requests for update using (true);
 
+-- ── 8. Marketplace v2: tiered unlocks, purchase-gated HTML, AI metadata ──────
+-- The built-in "shadow" catalog (metadata-only, no real HTML) is being replaced
+-- by real uploaded templates. Each template is either included in a plan tier
+-- (min_tier), purchasable individually, or free. The AI builds ONLY from a
+-- user's unlocked set. Template HTML is the paid asset, so it must NOT be
+-- world-readable — the old "anyone can browse templates" policy exposed the
+-- html column to everyone. HTML now lives in a separate, locked table and is
+-- served only through an entitlement function after a paywall check.
+
+alter table templates add column if not exists min_tier text;                          -- cheapest plan that includes it in the AI's buildable set; null = buy-only
+alter table templates add column if not exists is_free boolean not null default false;
+alter table templates add column if not exists builtin boolean not null default false;  -- owner-curated catalog vs community submission
+alter table templates add column if not exists style_tags text[] default '{}';          -- e.g. {minimal,bold,dark,elegant} — feeds AI template selection
+alter table templates add column if not exists layout text;                            -- e.g. hero-split, centered, full-bleed
+alter table templates add column if not exists industry text;                          -- finer-grained than category
+alter table templates add column if not exists thumbnail_url text;                     -- server-generated screenshot (optional; see OWNER_TODO)
+
+-- Move the paid asset (html) out of the world-readable templates table into a
+-- locked companion table. templates stays browsable (metadata + thumbnail); the
+-- html is served only via get_template_html() after an entitlement check.
+create table if not exists template_html (
+  template_id uuid primary key references templates(id) on delete cascade,
+  html text not null
+);
+alter table template_html enable row level security;
+
+-- Only the seller (or owner) may read/write the raw html row directly. Everyone
+-- else must go through get_template_html(), which enforces the paywall — so a
+-- blanket select can never dump paid source.
+drop policy if exists "sellers manage own template html" on template_html;
+create policy "sellers manage own template html" on template_html
+  for all using (
+    exists(select 1 from templates t where t.id = template_id and t.seller_user_id = auth.uid())
+    or (auth.jwt() ->> 'email') = 'prithivivijayakumar.work@gmail.com'
+  ) with check (
+    exists(select 1 from templates t where t.id = template_id and t.seller_user_id = auth.uid())
+    or (auth.jwt() ->> 'email') = 'prithivivijayakumar.work@gmail.com'
+  );
+
+-- Plan hierarchy → integer rank. archon_trial counts as archon.
+create or replace function tier_rank(plan text) returns int as $$
+  select case plan
+    when 'warden' then 5 when 'sovereign' then 4
+    when 'archon' then 3 when 'archon_trial' then 3
+    when 'scribe' then 2 when 'seeker' then 1
+    else 0 end;
+$$ language sql immutable;
+
+-- Does the CURRENT caller have this template unlocked? Free, they sold it,
+-- they purchased it, or it's included in their plan tier. security definer so it
+-- can read profiles + template_sales regardless of the caller's own RLS.
+create or replace function user_has_template(tid uuid) returns boolean as $$
+declare
+  t templates%rowtype;
+  uplan text;
+  uid uuid := auth.uid();
+begin
+  select * into t from templates where id = tid;
+  if not found then return false; end if;
+  if t.is_free then return true; end if;
+  if uid is null then return false; end if;
+  if t.seller_user_id = uid then return true; end if;
+  if (auth.jwt() ->> 'email') = 'prithivivijayakumar.work@gmail.com' then return true; end if;
+  if exists(select 1 from template_sales s where s.template_id = tid::text and s.buyer_user_id = uid) then return true; end if;
+  select coalesce(comp_plan, plan) into uplan from profiles where id = uid;
+  if t.min_tier is not null and tier_rank(coalesce(uplan,'apprentice')) >= tier_rank(t.min_tier) then return true; end if;
+  return false;
+end;
+$$ language plpgsql security definer stable;
+
+-- The ONLY way to read a template's html. Returns null if the caller hasn't
+-- unlocked it, so paid source never leaks to a non-buyer.
+create or replace function get_template_html(tid uuid) returns text as $$
+  select case when user_has_template(tid)
+    then (select html from template_html where template_id = tid)
+    else null end;
+$$ language sql security definer stable;
+
+-- The ids the caller has unlocked — for the "My Templates" gallery and the AI's
+-- buildable set. Returns ids only; html is fetched per-use via get_template_html
+-- so we never ship a bulk dump of paid source.
+create or replace function my_unlocked_template_ids() returns setof uuid as $$
+  select id from templates where user_has_template(id);
+$$ language sql security definer stable;
+
 -- ============================================================================
 -- Done. After running this, tell Claude Code (or just refresh the app) —
 -- no restart needed, PostgREST picks up new tables/columns automatically.

@@ -24,6 +24,29 @@ const TIER_INFO = {
   warden:    { name:'Warden',    price:'$349/mo' },
 };
 
+// Plan hierarchy for template entitlement — mirrors tier_rank() in
+// SUPABASE_FINAL.sql. A user's plan unlocks every template whose min_tier is at
+// or below their rank. archon_trial counts as archon. This is the CLIENT-SIDE
+// mirror used only to gate what the UI shows (lock badges, "unlock to preview");
+// the real paywall is enforced server-side by get_template_html() — the client
+// can never read a locked template's source no matter what the UI does.
+const TIER_RANK = { apprentice:0, seeker:1, scribe:2, archon:3, archon_trial:3, sovereign:4, warden:5 };
+const tierRank = p => TIER_RANK[p] ?? 0;
+// Is this template usable by the AI / editable by this user? Free, owned, bought,
+// or included in their plan tier. `purchasedIds` is a Set of template ids.
+function isTemplateUnlocked(t, userPlan, purchasedIds){
+  if(!t) return false;
+  if(t.is_free) return true;
+  if(purchasedIds && typeof purchasedIds.has === 'function' && purchasedIds.has(t.id)) return true;
+  if(t.min_tier && tierRank(userPlan) >= tierRank(t.min_tier)) return true;
+  return false;
+}
+// The cheapest plan (label) that would unlock a locked template, for upsell copy.
+function unlockTierLabel(t){
+  if(!t || !t.min_tier) return null;
+  return TIER_INFO[t.min_tier]?.name || (t.min_tier.charAt(0).toUpperCase()+t.min_tier.slice(1));
+}
+
 function startTierCheckout(tier,user,setScreen,toast) {
   if (!user?.id) { setScreen('auth'); return; }
   const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
@@ -325,6 +348,80 @@ const rebuildHtmlFromSections = (html, sections) => {
   doc.body.innerHTML = sections.map(s => s.html).join('');
   return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
 };
+
+// ── Untrusted-template security ──────────────────────────────────────────────
+// Marketplace templates are third-party HTML. There are two ways it gets shown,
+// each with its own defense:
+//   1. Read-only preview  → <SandboxedPreview>, a CROSS-ORIGIN sandbox. Even a
+//      malicious <script> there runs in an opaque origin and cannot touch our
+//      cookies or the Supabase session in localStorage. Full fidelity, safe.
+//   2. Loaded into the EDITOR → the builder iframe uses a blob: URL, which is
+//      SAME-ORIGIN (required so the inline editor can reach contentDocument).
+//      Isolation isn't possible there, so we strip active content first with
+//      sanitizeTemplateHtml(). The template's original JS is preserved for
+//      export/deploy (which runs on the customer's own domain, not ours) — only
+//      the in-app editor preview loses it, a fair trade to close the XSS path.
+function sanitizeTemplateHtml(html){
+  if(!html || typeof html !== 'string') return html;
+  try{
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    // Remove executable / redirecting nodes outright.
+    doc.querySelectorAll('script, base, link[rel="import"], meta[http-equiv], object, embed').forEach(n=>n.remove());
+    // Strip inline handlers, javascript:/data-html URLs, and nested srcdoc payloads.
+    doc.querySelectorAll('*').forEach(el=>{
+      [...el.attributes].forEach(a=>{
+        const n = a.name.toLowerCase();
+        const v = (a.value || '').replace(/\s+/g,'').toLowerCase();
+        if(n.startsWith('on')) el.removeAttribute(a.name);
+        else if(n === 'srcdoc') el.removeAttribute(a.name);
+        else if((n === 'href' || n === 'src' || n === 'xlink:href') && /^(javascript:|vbscript:|data:text\/html)/i.test(v)) el.removeAttribute(a.name);
+      });
+    });
+    return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+  }catch(e){
+    // If parsing fails, fail safe: strip the most dangerous bits with a regex
+    // rather than returning raw untrusted HTML.
+    return String(html).replace(/<script[\s\S]*?<\/script>/gi,'').replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi,'');
+  }
+}
+
+// Renders untrusted template HTML inside a cross-origin sandbox (see #1 above).
+// Lazy-mounts via IntersectionObserver so a gallery of many previews doesn't
+// spin up hundreds of iframes at once. `scale` shrinks a full-page render into a
+// thumbnail; thumbnails default to scripts OFF (static, cheapest, safest) while
+// a full-size preview keeps scripts ON for fidelity — still origin-isolated.
+function SandboxedPreview({ html, scale=1, allowScripts=null, height=null, radius=0, className='' }){
+  const wrapRef = useRef(null);
+  const [show, setShow] = useState(false);
+  const runScripts = allowScripts === null ? (scale === 1) : allowScripts;
+  useEffect(()=>{
+    const el = wrapRef.current;
+    if(!el) return;
+    if(typeof IntersectionObserver === 'undefined'){ setShow(true); return; }
+    const io = new IntersectionObserver((entries)=>{
+      entries.forEach(e=>{ if(e.isIntersecting){ setShow(true); io.disconnect(); } });
+    }, { rootMargin:'250px' });
+    io.observe(el);
+    return ()=>io.disconnect();
+  },[]);
+  const scaled = scale !== 1;
+  return (
+    <div ref={wrapRef} className={className} style={{overflow:'hidden',borderRadius:radius,height:height||'100%',width:'100%',position:'relative',background:'#0a0a14'}}>
+      {show && html ? (
+        <iframe
+          title="template preview"
+          sandbox={runScripts ? 'allow-scripts' : ''}
+          srcDoc={html}
+          scrolling={scaled ? 'no' : 'auto'}
+          loading="lazy"
+          style={scaled
+            ? { width:`${100/scale}%`, height:`${100/scale}%`, border:'none', transform:`scale(${scale})`, transformOrigin:'top left', pointerEvents:'none' }
+            : { width:'100%', height:height||'100%', border:'none', display:'block' }}
+        />
+      ) : <div style={{width:'100%',height:height||'100%'}}/>}
+    </div>
+  );
+}
 
 // Small library of generic, structure-neutral section snippets for the "Add
 // Section" palette — plain inline styles so they render reasonably inside
@@ -5259,7 +5356,9 @@ function MarketplacePage({toast,user}){
   const[myPurchaseSales,setMyPurchaseSales]=useState([]);
   const[loadError,setLoadError]=useState('');
   const[previewTmpl,setPreviewTmpl]=useState(null);
-  const[newTmpl,setNewTmpl]=useState({name:"",cat:"",desc:"",price:"",html:""});
+  const[previewHtml,setPreviewHtml]=useState(null);
+  const[previewLoading,setPreviewLoading]=useState(false);
+  const[newTmpl,setNewTmpl]=useState({name:"",cat:"",desc:"",price:"",html:"",layout:"",style_tags:""});
   const[submitting,setSubmitting]=useState(false);
   const[buyingId,setBuyingId]=useState('');
   const CATS=["All","Agricultural","Auto & Transportation","Automotive Specialty","Beauty & Salon","Childcare & Nanny","Cleaning (Commercial)","Education & Kids","Electrical","Events & Entertainment","Fashion & Clothing","Fitness & Sports","Food Production","Funeral & Memorial","HVAC","Health & Wellness","Home Renovation","Home Services","Hospitality","IT & Computer Repair","Interior Decoration","Marine Services","Medical Specialists","Mental Health","Music & Audio","Nonprofit & Community","Personal Development","Pet Services","Photography & Creative","Plumbing","Professional Services","Real Estate","Religious Organizations","Restaurant","Retail & Shops","Roofing","Senior Care","Spa & Relaxation","Sports Coaching","Tech & Digital","Travel & Tourism","Wedding Services"];
@@ -5279,6 +5378,8 @@ function MarketplacePage({toast,user}){
         id:t.id,name:t.name,cat:t.category,desc:t.description||'',price:Number(t.price),
         rating:Number(t.rating||0),reviews:t.reviews||0,seller:t.seller_name||'Community Creator',
         seller_user_id:t.seller_user_id,colors:t.colors||['#c9a84c','#1a1a2e'],
+        min_tier:t.min_tier||null,is_free:!!t.is_free,builtin:!!t.builtin,
+        style_tags:t.style_tags||[],layout:t.layout||null,industry:t.industry||t.category,thumbnail_url:t.thumbnail_url||null,
       })));
       if(!mySalesRes.error)setMySales(mySalesRes.data||[]);
       if(!myPurchasesRes.error){
@@ -5291,6 +5392,27 @@ function MarketplacePage({toast,user}){
     }
   };
   useEffect(()=>{loadMarketplaceData();},[user?.id]);
+
+  // When a preview opens, fetch the real HTML ONLY if the user has it unlocked.
+  // The server (get_template_html) is the actual gate — it returns null for a
+  // locked template no matter what — so a non-buyer can never pull paid source.
+  useEffect(()=>{
+    setPreviewHtml(null);
+    if(!previewTmpl) return;
+    const unlocked=isTemplateUnlocked(previewTmpl,user?.plan,purchased);
+    if(!unlocked) return;                       // locked → show upsell, never fetch source
+    if(typeof previewTmpl.id!=='string'||previewTmpl.id.startsWith('t')) return; // MOCK shadow ids have no real html row
+    let cancelled=false;
+    setPreviewLoading(true);
+    (async()=>{
+      try{
+        const{data,error}=await sb.rpc('get_template_html',{tid:previewTmpl.id});
+        if(!cancelled&&!error&&data) setPreviewHtml(data);
+      }catch(e){/* stays on the graceful fallback */}
+      if(!cancelled) setPreviewLoading(false);
+    })();
+    return()=>{cancelled=true;};
+  },[previewTmpl,user?.plan]);
 
   const allTemplates=[...MOCK_TEMPLATES,...communityTemplates];
   const filtered=allTemplates.filter(t=>(catFilter==="All"||t.cat===catFilter)&&(searchQ===""||t.name.toLowerCase().includes(searchQ.toLowerCase())||t.cat.toLowerCase().includes(searchQ.toLowerCase())));
@@ -5315,13 +5437,22 @@ function MarketplacePage({toast,user}){
     if(!user?.id){toast('Please sign in first.','error');return;}
     setSubmitting(true);
     try{
-      const{error}=await sb.from('templates').insert({
+      const styleTags=(newTmpl.style_tags||'').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+      // Metadata goes in the browsable `templates` row; the HTML (the paid asset)
+      // goes in the locked `template_html` table, readable only via the paywalled
+      // get_template_html() function — never exposed by a plain browse query.
+      const{data:inserted,error}=await sb.from('templates').insert({
         seller_user_id:user.id,seller_name:user.name||user.email,
         name:newTmpl.name,category:newTmpl.cat,description:newTmpl.desc,
-        price:Number(newTmpl.price)||0,html:newTmpl.html,
-      });
+        price:Number(newTmpl.price)||0,
+        layout:newTmpl.layout||null,style_tags:styleTags,industry:newTmpl.cat,
+      }).select('id').single();
       if(error)throw error;
-      setNewTmpl({name:"",cat:"",desc:"",price:"",html:""});
+      if(newTmpl.html&&inserted?.id){
+        const{error:hErr}=await sb.from('template_html').insert({template_id:inserted.id,html:newTmpl.html});
+        if(hErr)throw hErr;
+      }
+      setNewTmpl({name:"",cat:"",desc:"",price:"",html:"",layout:"",style_tags:""});
       toast("Template submitted — live in Browse now.","success");
       loadMarketplaceData();
     }catch(e){
@@ -5369,7 +5500,7 @@ function MarketplacePage({toast,user}){
           )}
         </div>
       )}
-      {tab==="sell"&&<div className="sell-form"><div className="card-title" style={{marginBottom:4}}>Submit a Template</div><div className="card-sub" style={{marginBottom:16}}>You earn 70% of every sale — paid out manually for now, see Earnings tab</div>{loadError&&<div style={{fontSize:'.78rem',color:'#e07878',padding:'10px 14px',background:'rgba(224,120,120,.08)',border:'1px solid rgba(224,120,120,.2)',marginBottom:12}}>{loadError}</div>}<div className="field"><label>Template Name</label><input className="inp" placeholder="ProContractor" value={newTmpl.name} onChange={e=>setNewTmpl(p=>({...p,name:e.target.value}))}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><div className="field"><label>Category</label><select className="inp" value={newTmpl.cat} onChange={e=>setNewTmpl(p=>({...p,cat:e.target.value}))}><option value="">— Select —</option>{CATS.filter(c=>c!=="All").map(c=><option key={c} value={c}>{c}</option>)}</select></div><div className="field"><label>Price ($)</label><input className="inp" type="number" placeholder="49" value={newTmpl.price} onChange={e=>setNewTmpl(p=>({...p,price:e.target.value}))}/></div></div><div className="field"><label>Description</label><textarea className="inp" rows={2} value={newTmpl.desc} onChange={e=>setNewTmpl(p=>({...p,desc:e.target.value}))}/></div><div className="field"><label>HTML Code</label><textarea className="inp" rows={4} placeholder="Paste your full HTML here…" value={newTmpl.html} onChange={e=>setNewTmpl(p=>({...p,html:e.target.value}))}/></div><button className="btn btn-gold btn-full" onClick={submitTemplate} disabled={submitting}>{submitting?<><Spinner/>Submitting…</>:'Submit Template'}</button></div>}
+      {tab==="sell"&&<div className="sell-form"><div className="card-title" style={{marginBottom:4}}>Submit a Template</div><div className="card-sub" style={{marginBottom:16}}>You earn 70% of every sale — paid out manually for now, see Earnings tab</div>{loadError&&<div style={{fontSize:'.78rem',color:'#e07878',padding:'10px 14px',background:'rgba(224,120,120,.08)',border:'1px solid rgba(224,120,120,.2)',marginBottom:12}}>{loadError}</div>}<div className="field"><label>Template Name</label><input className="inp" placeholder="ProContractor" value={newTmpl.name} onChange={e=>setNewTmpl(p=>({...p,name:e.target.value}))}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><div className="field"><label>Category</label><select className="inp" value={newTmpl.cat} onChange={e=>setNewTmpl(p=>({...p,cat:e.target.value}))}><option value="">— Select —</option>{CATS.filter(c=>c!=="All").map(c=><option key={c} value={c}>{c}</option>)}</select></div><div className="field"><label>Price ($)</label><input className="inp" type="number" placeholder="49" value={newTmpl.price} onChange={e=>setNewTmpl(p=>({...p,price:e.target.value}))}/></div></div><div className="field"><label>Description</label><textarea className="inp" rows={2} value={newTmpl.desc} onChange={e=>setNewTmpl(p=>({...p,desc:e.target.value}))}/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><div className="field"><label>Layout style</label><input className="inp" placeholder="e.g. hero-split, centered, full-bleed" value={newTmpl.layout} onChange={e=>setNewTmpl(p=>({...p,layout:e.target.value}))}/></div><div className="field"><label>Style tags (comma-separated)</label><input className="inp" placeholder="minimal, bold, dark, elegant" value={newTmpl.style_tags} onChange={e=>setNewTmpl(p=>({...p,style_tags:e.target.value}))}/></div></div><div style={{fontSize:'.68rem',color:'#3a3848',lineHeight:1.6,marginBottom:10,marginTop:-4}}>Layout + tags help the AI match your template to the right business. They power template selection, not just search.</div><div className="field"><label>HTML Code</label><textarea className="inp" rows={4} placeholder="Paste your full HTML here…" value={newTmpl.html} onChange={e=>setNewTmpl(p=>({...p,html:e.target.value}))}/></div><div style={{fontSize:'.68rem',color:'#3a3848',lineHeight:1.6,marginBottom:12}}>Your HTML is stored privately and only served to buyers/unlocked users. Previews run in an isolated sandbox, so your source is never exposed to non-buyers.</div><button className="btn btn-gold btn-full" onClick={submitTemplate} disabled={submitting}>{submitting?<><Spinner/>Submitting…</>:'Submit Template'}</button></div>}
       {tab==="earnings"&&<div><div className="earnings-grid">{[{n:`$${mySales.reduce((a,s)=>a+Number(s.creator_cut||0),0).toFixed(2)}`,l:"Total Earnings"},{n:myTemplates.length,l:"Templates Listed"},{n:"70%",l:"Revenue Share"},{n:mySales.length,l:"Sales"},{n:`$${myPurchaseSales.reduce((a,s)=>a+Number(s.amount||0),0).toFixed(2)}`,l:"Total Spent"},{n:`$${mySales.filter(s=>s.payout_status==='pending').reduce((a,s)=>a+Number(s.creator_cut||0),0).toFixed(2)}`,l:"Pending Payout"}].map((e,i)=><div key={i} className="earn-card"><div className="earn-n">{e.n}</div><div className="earn-l">{e.l}</div></div>)}</div><div style={{fontSize:'.7rem',color:'#3a3848',marginTop:14,lineHeight:1.7}}>Payouts are manual for now — the owner reviews pending sales and pays out directly (no automated Stripe Connect transfer yet). Balances above are computed from real recorded sales, not estimates.</div></div>}
               {previewTmpl&&(
           <div className="modal-bg" onClick={()=>setPreviewTmpl(null)}>
@@ -5390,8 +5521,21 @@ function MarketplacePage({toast,user}){
               </div>
               {/* Body - two columns */}
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",flex:1,overflow:"auto",minHeight:0}}>
-                {/* Left: visual mockup in template colors */}
-                <div style={{background:previewTmpl.colors[0],padding:24,display:"flex",flexDirection:"column",gap:10}}>
+                {/* Left: real sandboxed preview when unlocked, else a color-mock with a lock hint */}
+                {previewHtml?(
+                <div style={{background:"#0a0a14",minHeight:360,position:"relative"}}>
+                  <SandboxedPreview html={previewHtml} allowScripts={true} height={"100%"}/>
+                </div>
+                ):(
+                <div style={{background:previewTmpl.colors[0],padding:24,display:"flex",flexDirection:"column",gap:10,position:"relative"}}>
+                  {previewLoading&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(10,10,20,.5)",zIndex:2}}><Spinner/></div>}
+                  {!previewLoading&&!isTemplateUnlocked(previewTmpl,user?.plan,purchased)&&(previewTmpl.min_tier||(typeof previewTmpl.id==="string"&&!previewTmpl.id.startsWith("t")))&&(
+                    <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8,background:"rgba(10,10,20,.72)",zIndex:2,textAlign:"center",padding:20}}>
+                      <div style={{fontSize:"1.4rem"}}>🔒</div>
+                      <div style={{fontFamily:"'Cinzel',serif",fontSize:".82rem",fontWeight:700,color:"#ddd8ce"}}>Full preview locks with access</div>
+                      <div style={{fontSize:".72rem",color:"#8a8898",lineHeight:1.6,maxWidth:220}}>{unlockTierLabel(previewTmpl)?`Included in ${unlockTierLabel(previewTmpl)} and up — or buy it once for $${previewTmpl.price}.`:`Buy this template for $${previewTmpl.price} to preview and use the full design.`}</div>
+                    </div>
+                  )}
                   {/* Mock nav */}
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                     <div style={{width:60,height:6,background:previewTmpl.colors[1],borderRadius:3,opacity:.8}}/>
@@ -5422,6 +5566,7 @@ function MarketplacePage({toast,user}){
                     <div style={{width:70,height:5,background:previewTmpl.colors[1],opacity:.4,borderRadius:1}}/>
                   </div>
                 </div>
+                )}
                 {/* Right: details */}
                 <div style={{padding:24,overflowY:"auto"}}>
                   <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:".56rem",letterSpacing:"2px",textTransform:"uppercase",color:"#3a3848",marginBottom:8}}>About this template</div>

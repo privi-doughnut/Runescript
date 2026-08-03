@@ -109,3 +109,11 @@ Steps:
 4. **API restrictions** → ideally restrict to just the Places/Maps APIs it uses, not "Don't restrict key".
 
 Better long-term (optional real build): proxy Places through the Worker with the key as a Cloudflare secret — like `/pagespeed` and `/domain-check` already are — so the key never reaches the browser. Not needed if the referrer restriction is in place.
+
+## 14. Re-run `SUPABASE_FINAL.sql` again for Marketplace v2 (before uploading real templates)
+
+Added 2026-08-03. The file gained a **§8** (tiered template unlocks, a locked `template_html` table, and the `get_template_html`/`user_has_template`/`tier_rank` entitlement functions) as groundwork for replacing the shadow catalog with real templates. Same as always: Supabase → SQL Editor → paste the whole file → run. Idempotent. Do this before importing the real templates, or their HTML won't have a gated home to live in. Full architecture is in `TEMPLATES_PLAN.md`.
+
+## 15. (Optional) Enable Cloudflare Browser Rendering for server-generated template thumbnails
+
+Added 2026-08-03. You're not supplying thumbnails, so the marketplace gallery generates previews itself. For **unlocked** templates it shows a live sandboxed preview (safe); for **locked** templates it shows a styled placeholder so paid source never ships to a non-buyer. To show real preview *images* of locked templates in the public gallery (nicer, and still no source leak), enable **Cloudflare Browser Rendering** (Workers → your account → Browser Rendering) and we can add a Worker endpoint that screenshots a template's HTML → an image stored in `templates.thumbnail_url`. Needs a paid Workers plan with the Browser binding. Purely a nice-to-have — the gallery works without it (placeholders + live previews for what you own). Not urgent.
