@@ -112,7 +112,7 @@ Better long-term (optional real build): proxy Places through the Worker with the
 
 ## 14. Re-run `SUPABASE_FINAL.sql` again for Marketplace v2 (before uploading real templates)
 
-Added 2026-08-03. The file gained a **§8** (tiered template unlocks, a locked `template_html` table, and the `get_template_html`/`user_has_template`/`tier_rank` entitlement functions) as groundwork for replacing the shadow catalog with real templates. Same as always: Supabase → SQL Editor → paste the whole file → run. Idempotent. Do this before importing the real templates, or their HTML won't have a gated home to live in. Full architecture is in `TEMPLATES_PLAN.md`.
+Added 2026-08-03. The file gained a **§8** (tiered template unlocks, a locked `template_html` table, and the `get_template_html`/`user_has_template`/`tier_rank` entitlement functions) and a **§9** (marketplace expands to a UI/UX database: `asset_type` template|component, plus enforced copyright/licensing columns — see `COPYRIGHT_POLICY.md`). Same as always: Supabase → SQL Editor → paste the whole file → run. Idempotent. Do this before importing the real templates/components, or their HTML won't have a gated home to live in and the licensing constraints won't exist. Full architecture is in `TEMPLATES_PLAN.md`.
 
 ## 15. (Optional) Enable Cloudflare Browser Rendering for server-generated template thumbnails
 

@@ -370,6 +370,50 @@ create or replace function my_unlocked_template_ids() returns setof uuid as $$
   select id from templates where user_has_template(id);
 $$ language sql security definer stable;
 
+-- ── 9. UI/UX component database + copyright/licensing guardrails ─────────────
+-- The marketplace is expanding from full-site templates into a UI/UX database:
+-- reusable mini-features (pricing tables, testimonial carousels, sticky navs,
+-- hero patterns, etc.) alongside whole templates. Bigger catalog, more sales.
+--
+-- HARD RULE (owner's directive — do not weaken): we do not resell other
+-- designers' work. Every sellable asset must be either ORIGINAL (authored fresh
+-- by us / the generator / the submitting creator) or under a license that
+-- explicitly PERMITS redistribution/resale. Design *patterns and techniques*
+-- learned from references are fine (ideas aren't copyrightable); copying a
+-- specific creator's expression/code and selling it is NOT. See COPYRIGHT_POLICY.md.
+
+alter table templates add column if not exists asset_type text not null default 'template';  -- 'template' (full site) | 'component' (mini-feature)
+alter table templates add column if not exists license text;                                  -- distribution license; see allow-list below
+alter table templates add column if not exists license_source_url text;                       -- provenance: where a referenced pattern/asset came from (audit trail)
+alter table templates add column if not exists attribution text;                              -- required credit line for CC-BY-family licenses (shown to buyers)
+
+-- asset_type is constrained to the two known kinds.
+alter table templates drop constraint if exists templates_asset_type_ck;
+alter table templates add constraint templates_asset_type_ck
+  check (asset_type in ('template','component'));
+
+-- License allow-list. NULL is tolerated only for legacy/unpublished rows; the
+-- app requires a license on submit. Every value here permits redistribution:
+--   original       — authored fresh for Rune Script (ours to sell)
+--   CC0            — public domain dedication
+--   CC-BY / CC-BY-SA — Creative Commons, attribution required (see attribution)
+--   MIT / apache-2.0 / BSD-3-Clause — permissive OSS, attribution in-code
+--   owner-licensed — the owner bought redistribution rights for this asset
+-- Proprietary / all-rights-reserved third-party work simply has no valid value
+-- to pick here, which is the guardrail: it cannot be listed.
+alter table templates drop constraint if exists templates_license_ck;
+alter table templates add constraint templates_license_ck
+  check (license is null or license in
+    ('original','CC0','CC-BY','CC-BY-SA','MIT','apache-2.0','BSD-3-Clause','owner-licensed'));
+
+-- CC-BY and CC-BY-SA legally REQUIRE visible attribution — enforce that the
+-- credit line is present when one of those licenses is chosen.
+alter table templates drop constraint if exists templates_attribution_ck;
+alter table templates add constraint templates_attribution_ck
+  check (license not in ('CC-BY','CC-BY-SA') or (attribution is not null and length(trim(attribution)) > 0));
+
+create index if not exists templates_asset_type_idx on templates (asset_type);
+
 -- ============================================================================
 -- Done. After running this, tell Claude Code (or just refresh the app) —
 -- no restart needed, PostgREST picks up new tables/columns automatically.

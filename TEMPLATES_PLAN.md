@@ -88,8 +88,41 @@ Two display paths, two defenses:
    gallery shows the image (source never ships); until then, unlocked templates show
    live sandboxed previews and locked ones show styled placeholders (no leak).
 
+## Direction locked (2026-08-03)
+- **Generation-first, library-as-reference, NO React rebuild.** Runescript keeps
+  emitting self-contained vanilla HTML (best deliverable for small-biz sites). The
+  premium React/Spline library is a *reference corpus* to sharpen generation, plus
+  a *converted static subset* for direct sale. Confirmed with the owner.
+- **Marketplace expands to a UI/UX database:** not just full templates but reusable
+  **mini-features / components** (pricing tables, testimonial carousels, sticky
+  navs, hero patterns…). Bigger catalog, more sales. `asset_type` = 'template' |
+  'component' (SQL §9).
+- **Copyright is a hard rule** — see `COPYRIGHT_POLICY.md`. We take the *lesson,
+  not the file*: learn design DNA (patterns/techniques — not copyrightable), author
+  fresh originals. Every sellable asset is `original` or under a redistribution-
+  permitting license (CC0/CC-BY/CC-BY-SA/MIT/Apache/BSD/owner-licensed). The DB
+  (§9 constraints) + submit form (license + attestation) enforce this; proprietary
+  third-party work has no valid way to be listed.
+- Sourced tools (21st MCP, ui-ux-pro-max skill, shadcn/skiper, Spline, motion-ai)
+  are **references/tools for authoring originals**, not inventory to copy.
+
+## Full app redesign (requested — big, staged)
+The owner wants a full redesign of the Rune Script app UI using the new design
+tools. This is large and must NOT be one-shot on the 9k-line single file. Plan:
+1. Apply `DESIGN_SYSTEM.md` to the app's own UI, screen by screen (it's React with
+   inline styles + a CSS constant today — stays single-file per CLAUDE.md unless we
+   decide otherwise).
+2. **Open decision:** does the app's *own* UI adopt Tailwind/shadcn (a real tooling
+   + build change to App.jsx), or stay vanilla and get hand-crafted to the design
+   system? Recommend staying vanilla for now (keeps the single-file deploy simple);
+   use the ui-ux skill / 21st as design references while restyling.
+3. Sequence: design tokens/system pass → high-traffic screens (landing, builder,
+   CRM, marketplace) → the rest. Verify each in a real browser.
+
 ## Owner actions
-- **Re-run `SUPABASE_FINAL.sql`** (idempotent) to apply §8 before real templates land.
+- **Re-run `SUPABASE_FINAL.sql`** (idempotent) — now includes **§8** (tiered
+  unlocks) and **§9** (component asset type + licensing guardrails). Do before real
+  templates/components land.
 - (Optional) Enable **Cloudflare Browser Rendering** for server-side thumbnails —
   see OWNER_TODO. Until then the gallery degrades gracefully (no source leak).
 - Stripe Connect setup when ready (creator payouts).
