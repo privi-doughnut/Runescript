@@ -60,6 +60,17 @@ All 5 tiers are wired for checkout (Seeker $10, Scribe $49, Archon $99 w/ 30-day
 - Large-file edits: edit in place with precise str_replace, never paste the whole file into a browser editor.
 - **Compile-checking is not the same as verifying it works.** This file has a real history of bugs that pass every static check (undeclared variables only referenced inside event handlers, features that render nothing because the component that owns them never got mounted, etc.). Get the app running in a real browser (Node 22 via nvm + Vite, see above) and actually click the thing before calling a UI fix done.
 
+## Design standard (anti-slop) — read before building or generating any UI
+`DESIGN_SYSTEM.md` is the canonical design standard for the app's own UI **and**
+the AI's site generation — the owner's "Ultimate Design Engineering & Anti-Slop
+System" (motion, layout rhythm, interactive states, semantic HTML, banned
+buzzwords, deterministic loading, etc.). Its operational vanilla-HTML translation
+lives as `DESIGN_SYSTEM_PROMPT` in `src/App.jsx` and is prepended to every Site
+Builder generation prompt. When touching app UI, follow it. If you change one,
+keep the doc and the prompt constant in sync. `/polish` and the "Grill Protocol"
+(ask 2–3 focused questions before a big new view) are behaviors for you, the
+assistant — honor them.
+
 ## Known pending / follow-up items
 - Email sequence scheduler and creator earnings backend both need new Supabase tables — exact SQL is in PROGRESS.md. No schema-modification access from this session (anon key only).
 - GitHub OAuth login likely needs the live site URL added to Supabase's Redirect URL allowlist (owner-only, Supabase dashboard → Authentication → URL Configuration). Was `https://runescript.netlify.app` — now that the site has moved to Cloudflare (`https://runescript.its-the-prithivi-show.workers.dev`, see Live infrastructure above), that URL needs to be added there too (and the old Netlify one can probably stay or be removed, owner's call).

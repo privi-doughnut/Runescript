@@ -47,6 +47,36 @@ function unlockTierLabel(t){
   return TIER_INFO[t.min_tier]?.name || (t.min_tier.charAt(0).toUpperCase()+t.min_tier.slice(1));
 }
 
+// ── Anti-slop design system ──────────────────────────────────────────────────
+// The owner's "Ultimate Design Engineering & Anti-Slop System" translated to
+// Runescript's actual output target: ONE self-contained HTML document with an
+// inline <style> block (no Tailwind/frameworks — the builder edits raw HTML).
+// Prepended to every AI site-generation prompt so generation quality no longer
+// depends on the template library alone. Canonical source: DESIGN_SYSTEM.md.
+const DESIGN_SYSTEM_PROMPT = `You are an elite design engineer, not a template mill. Output ONE self-contained, responsive HTML document with an inline <style> block (no external CSS/JS frameworks). Obey these rules exactly — they are what separate a premium site from generic AI slop:
+
+MOTION — Animate ONLY transform and opacity (never width/height/margin/top/left — no layout thrashing). Micro-interactions under 300ms with a custom cubic-bezier (never linear). Entry animations scale from 0.95, NEVER from scale(0). Always include @media (prefers-reduced-motion: reduce) that replaces motion with a plain opacity crossfade.
+
+LAYOUT & TYPE — Cap prose line length near 65ch (max-width on text blocks); never run body text full-width on large screens. Put font-variant-numeric: tabular-nums on prices, stats and data columns. Use ONE consistent spacing scale (4/8/12/16/24/32/48/64px) — no arbitrary one-off pixel values. Use text-wrap: balance on headings.
+
+ANTI-SLOP COMPOSITION — Do NOT ship a generic centered hero of Inter over a dark purple/blue gradient. NO ambient blurred blobs, NO backdrop-blur, NO mesh gradients. Use solid structural color, crisp 1px borders, and real editorial layout: deliberate asymmetry, multi-column grids, strong typographic scale contrast. Underlines are for real links ONLY — emphasize with weight or color.
+
+INTERACTIVE STATES — EVERY button/link/interactive element defines :hover, :focus-visible AND :active. Replace the default outline with a branded focus-visible ring (offset). :active presses tactilely — transform: scale(0.98) or a darker tint.
+
+COPY — Plain, direct, concrete language. BANNED buzzwords: unleash, streamline, empower, seamless/seamlessly, revolutionize, testament, elevate, unlock, supercharge, game-changer, cutting-edge. Write like a real business, not a pitch deck.
+
+ICONS — Functional only (real labels/affordances). Never decorate every heading with an icon to fill space.
+
+LOADING — If any content loads async, use structural skeletons matching the final layout — never infinite spinners.
+
+TEXT HYGIENE — All-caps text ALWAYS gets explicit letter-spacing. No single-word heading orphans.
+
+STRUCTURE & A11Y — Semantic tags only: <header> <nav> <main> <section> <article> <footer> <button> — not <div>/<span> for structure or actions. Icon-only buttons get aria-label; expandable regions get aria-expanded.
+
+INTEGRITY — No doubled borders where 1px cells meet. Give dynamic-content containers a stable min-height to avoid layout shift. Add scrollbar-gutter: stable so the page doesn't jump when scrollbars appear.
+
+Prefer less code: remove/simplify over adding wrapper hacks.`;
+
 function startTierCheckout(tier,user,setScreen,toast) {
   if (!user?.id) { setScreen('auth'); return; }
   const workerUrl = window.CLAUDE_ENDPOINT || 'https://runescript.its-the-prithivi-show.workers.dev';
@@ -4477,8 +4507,8 @@ function SiteBuilderPage({toast,onSiteBuilt,prospects=[]}){
     const homeCtx=pages.home?`The home page HTML starts with: ${pages.home.slice(0,400)}...`:'';
     const pageHint=PAGES_LIST.find(p=>p.id===activePage)?.hint||'';
     const prompt=isFirst
-      ?`Build a complete, beautiful HTML page for the "${activePage}" section of this website. ${pageHint} Business/context: "${msg}". ${homeCtx} Match the visual style of the home page if provided. Return ONLY complete HTML starting with <!DOCTYPE html>.`
-      :`Modify the ${activePage} page: "${msg}". Current HTML: ${(pages[activePage]||'').slice(0,2000)}... Return COMPLETE updated HTML only.`;
+      ?`${DESIGN_SYSTEM_PROMPT}\n\nNow build a complete, production-quality HTML page for the "${activePage}" section of this website. ${pageHint} Business/context: "${msg}". ${homeCtx} Match the visual style of the home page if provided. Return ONLY complete HTML starting with <!DOCTYPE html>.`
+      :`${DESIGN_SYSTEM_PROMPT}\n\nModify the ${activePage} page per this request: "${msg}". Preserve the existing design and hold the same quality bar above (semantic tags, full interactive states, no slop, banned buzzwords). Current HTML: ${(pages[activePage]||'').slice(0,2000)}... Return COMPLETE updated HTML only.`;
     try{
       const raw=await callClaude(prompt,8000);
       const html=raw.replace(/```html|```/g,'').trim();
