@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rune Script — Redesign v2 (bolder)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#07070e;--bg2:#0b0b16;--ink:#e7e2d6;--dim:#8f8b9c;--faint:#4a4858;
+    --gold:#c9a84c;--gold2:#e6c979;--line:rgba(201,168,76,.16);--hair:rgba(231,226,214,.07);
+    --paper:#efe7d6;--paper-ink:#171310;
+    --ease:cubic-bezier(.16,1,.3,1);
+  }
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;min-width:0}
+  html{scrollbar-gutter:stable}
+  body{background:var(--bg);color:var(--ink);font-family:'DM Sans',system-ui,sans-serif;font-weight:300;
+    line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 clamp(16px,4vw,48px)}
+  .mono{font-family:'JetBrains Mono',monospace}
+
+  /* nav */
+  header{position:sticky;top:0;z-index:50;border-bottom:1px solid var(--hair);background:rgba(7,7,14,.8)}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .brand{display:flex;align-items:center;gap:11px;text-decoration:none;color:var(--ink)}
+  .rune{width:32px;height:32px;display:grid;place-items:center;border:1px solid var(--line);color:var(--gold);
+    font-family:'Cinzel',serif;font-weight:700}
+  .bname{font-family:'Cinzel',serif;font-weight:700;letter-spacing:.5px}.bname b{color:var(--gold)}
+  .nlinks{display:flex;align-items:center;gap:28px}
+  .nlinks a{font-family:'JetBrains Mono',monospace;font-size:.64rem;letter-spacing:2px;text-transform:uppercase;
+    color:var(--dim);text-decoration:none;transition:color .2s var(--ease)}
+  .nlinks a:not(.btn):hover{color:var(--ink)}
+  @media(max-width:760px){.nlinks .h{display:none}}
+
+  .btn{font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:1.5px;text-transform:uppercase;
+    display:inline-flex;align-items:center;gap:8px;padding:12px 20px;border:1px solid transparent;cursor:pointer;
+    text-decoration:none;transition:transform .18s var(--ease),background .2s,border-color .2s,color .2s,box-shadow .2s}
+  .btn:focus-visible{outline:none;box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--gold)}
+  .btn:active{transform:scale(.97)}
+  .btn-gold{background:var(--gold);color:#12101a;font-weight:500;border-color:var(--gold)}
+  .btn-gold:hover{background:var(--gold2);box-shadow:0 10px 34px rgba(201,168,76,.25)}
+  .btn-ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+  .btn-dark{background:var(--paper-ink);color:var(--paper);border-color:var(--paper-ink)}
+  .btn-dark:hover{transform:translateY(-1px);box-shadow:0 10px 30px rgba(0,0,0,.25)}
+
+  /* HERO — oversized, animated beam, command input */
+  .hero{position:relative;padding:clamp(56px,9vw,120px) 0 clamp(40px,6vw,72px);text-align:center;overflow:hidden}
+  .hero::before{content:"";position:absolute;inset:0;z-index:-1;
+    background:radial-gradient(90% 55% at 50% -8%,rgba(201,168,76,.12),transparent 55%)}
+  .eyebrow{display:inline-flex;align-items:center;gap:9px;border:1px solid var(--line);padding:7px 15px;
+    font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:2.5px;text-transform:uppercase;
+    color:var(--gold);margin-bottom:var(--sp,32px);margin-bottom:30px}
+  .eyebrow .dot{width:5px;height:5px;background:var(--gold);border-radius:50%;box-shadow:0 0 0 3px rgba(201,168,76,.18)}
+  h1{font-family:'Cinzel',serif;font-weight:900;font-size:clamp(3rem,8vw,6.5rem);line-height:.98;letter-spacing:-1px;
+    text-wrap:balance;margin-bottom:26px}
+  h1 .beam{color:var(--gold);position:relative;display:inline-block}
+  h1 .beam::after{content:"";position:absolute;left:0;right:0;bottom:.06em;height:5px;
+    background:linear-gradient(90deg,transparent,var(--gold2),transparent);background-size:200% 100%;
+    animation:beam 2.6s var(--ease) infinite}
+  h1 .stroke{color:transparent;-webkit-text-stroke:1.4px rgba(201,168,76,.32)}
+  .lede{font-size:clamp(1.02rem,1.5vw,1.22rem);color:var(--dim);max-width:60ch;margin:0 auto 38px;line-height:1.7}
+  /* command input mock (21st-style) */
+  .cmd{max-width:600px;margin:0 auto 20px;display:flex;align-items:center;gap:10px;border:1px solid var(--line);
+    background:linear-gradient(180deg,#0d0d1a,#0a0a14);padding:9px 9px 9px 18px}
+  .cmd .pfx{font-family:'JetBrains Mono',monospace;color:var(--gold);font-size:.8rem}
+  .cmd .ph{flex:1;text-align:left;font-family:'JetBrains Mono',monospace;color:var(--faint);font-size:.82rem}
+  .cmd .ph b{color:var(--dim);font-weight:400}
+  .subcta{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:1.5px;color:var(--faint);text-transform:uppercase}
+
+  /* marquee */
+  .mq{border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);padding:16px 0;overflow:hidden;
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+  .mq-track{display:flex;gap:44px;width:max-content;animation:scroll 26s linear infinite}
+  .mq-track span{font-family:'JetBrains Mono',monospace;font-size:.72rem;letter-spacing:2px;text-transform:uppercase;
+    color:var(--faint);white-space:nowrap;display:inline-flex;align-items:center;gap:44px}
+  .mq-track span::after{content:"◆";color:var(--gold);font-size:.5rem}
+
+  /* CREAM EDITORIAL BAND — the bold visible departure */
+  .band{background:var(--paper);color:var(--paper-ink);padding:clamp(56px,9vw,120px) 0;position:relative}
+  .band .wrap{display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(28px,5vw,72px);align-items:center}
+  @media(max-width:840px){.band .wrap{grid-template-columns:1fr;gap:36px}}
+  .band .tag{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:2.5px;text-transform:uppercase;
+    color:#8a6d2a;margin-bottom:20px}
+  .band h2{font-family:'Cinzel',serif;font-weight:900;font-size:clamp(2rem,4.4vw,3.6rem);line-height:1.05;
+    letter-spacing:-.5px;text-wrap:balance;margin-bottom:22px}
+  .band p{font-size:1.05rem;color:#4a4038;max-width:46ch;line-height:1.75}
+  .compare{border:1px solid rgba(23,19,16,.14);background:#f7f1e5}
+  .compare .row{display:flex;justify-content:space-between;align-items:center;padding:15px 20px;
+    border-bottom:1px solid rgba(23,19,16,.09);font-size:.92rem}
+  .compare .row:last-child{border-bottom:none}
+  .compare .row .k{color:#6a5f52}
+  .compare .row .old{color:#a0958a;text-decoration:line-through;font-family:'JetBrains Mono',monospace;font-size:.8rem}
+  .compare .row .new{color:var(--paper-ink);font-weight:600;font-variant-numeric:tabular-nums}
+
+  /* BENTO grid (21st signature) */
+  .bento-wrap{padding:clamp(56px,8vw,104px) 0}
+  .bhead{text-align:center;margin-bottom:44px}
+  .bhead .tag{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);margin-bottom:14px}
+  .bhead h2{font-family:'Cinzel',serif;font-weight:900;font-size:clamp(1.9rem,4vw,3rem);text-wrap:balance}
+  .bento{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:170px;gap:14px}
+  @media(max-width:840px){.bento{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:520px){.bento{grid-template-columns:1fr}}
+  .b{border:1px solid var(--line);background:linear-gradient(180deg,#0c0c18,#090912);padding:24px;
+    display:flex;flex-direction:column;justify-content:flex-end;position:relative;overflow:hidden;
+    transition:transform .3s var(--ease),border-color .3s var(--ease)}
+  .b:hover{transform:translateY(-3px);border-color:rgba(201,168,76,.4)}
+  .b .ic{width:24px;height:24px;color:var(--gold);position:absolute;top:22px;left:24px}
+  .b h3{font-family:'Cinzel',serif;font-weight:700;font-size:1.12rem;margin-bottom:7px}
+  .b p{font-size:.84rem;color:var(--dim);line-height:1.6;max-width:32ch}
+  .b.wide{grid-column:span 2}.b.tall{grid-row:span 2}
+  .b .big{font-family:'Cinzel',serif;font-weight:900;font-size:2.8rem;color:var(--gold);font-variant-numeric:tabular-nums;line-height:1}
+  .b.feat{background:linear-gradient(150deg,rgba(201,168,76,.14),#0a0a14 60%)}
+
+  footer{padding:64px 0;text-align:center;color:var(--faint);font-family:'JetBrains Mono',monospace;
+    font-size:.62rem;letter-spacing:1.5px;border-top:1px solid var(--hair)}
+  .flag{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:99;font-family:'JetBrains Mono',monospace;
+    font-size:.56rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);border:1px solid var(--line);
+    background:rgba(7,7,14,.92);padding:7px 15px}
+
+  .rise{opacity:0;transform:translateY(20px) scale(.97);animation:rise .7s var(--ease) forwards}
+  .d1{animation-delay:.05s}.d2{animation-delay:.14s}.d3{animation-delay:.23s}.d4{animation-delay:.32s}.d5{animation-delay:.41s}
+  @keyframes rise{to{opacity:1;transform:none}}
+  @keyframes beam{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  @keyframes scroll{to{transform:translateX(-50%)}}
+  @media(prefers-reduced-motion:reduce){
+    .rise{animation:fade .01s forwards;transform:none}.mq-track{animation:none}.beam::after{animation:none}
+    @keyframes fade{to{opacity:1}}
+  }
+</style>
+</head>
+<body>
+  <div class="flag">Redesign v2 — bolder, 21st-inspired · cream band + bento + marquee</div>
+  <header><nav class="nav wrap">
+    <a class="brand" href="#" aria-label="Rune Script home"><span class="rune" aria-hidden="true">ᚱ</span><span class="bname">RUNE&nbsp;<b>SCRIPT</b></span></a>
+    <div class="nlinks">
+      <a href="#" class="h">Platform</a><a href="#" class="h">Marketplace</a><a href="#" class="h">Pricing</a>
+      <a href="#" class="btn btn-ghost">Sign in</a>
+      <a href="#" class="btn btn-gold">Start free <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+    </div>
+  </nav></header>
+
+  <section class="hero">
+    <div class="wrap">
+      <span class="eyebrow rise d1"><span class="dot"></span>Prospect → Pitch → Build → Deploy</span>
+      <h1 class="rise d2">Run the whole<br><span class="beam">agency</span> from one <span class="stroke">console</span>.</h1>
+      <p class="lede rise d3">Rune Script finds real local businesses, writes the pitch, and its agent builds the site from their own data — held to a strict anti-slop bar. You keep every line of code.</p>
+      <div class="cmd rise d4"><span class="pfx">›</span><span class="ph"><b>build</b> a site for Rivera &amp; Sons Plumbing, Austin TX</span><a href="#" class="btn btn-gold">Run</a></div>
+      <div class="subcta rise d5">Free to start · no card · export anytime</div>
+    </div>
+  </section>
+
+  <div class="mq"><div class="mq-track"><span>AI Prospect Scanner<span></span></span><span>Pitch Generator</span><span>Agent Build Mode</span><span>Wix-style Editor</span><span>Full Code Access</span><span>Built-in CMS</span><span>E-commerce</span><span>Booking</span><span>Marketplace</span><span>Agency OS</span><span>AI Studio</span><span>AI Prospect Scanner</span><span>Pitch Generator</span><span>Agent Build Mode</span><span>Wix-style Editor</span><span>Full Code Access</span><span>Built-in CMS</span><span>E-commerce</span><span>Booking</span><span>Marketplace</span><span>Agency OS</span><span>AI Studio</span></div></div>
+
+  <!-- CREAM EDITORIAL BAND -->
+  <section class="band">
+    <div class="wrap">
+      <div>
+        <div class="tag">The old way is slow</div>
+        <h2>Most freelancers stitch together six tools. You need one.</h2>
+        <p>Prospecting in one tab, cold email in another, a site builder in a third, invoices somewhere else. Rune Script collapses the whole pipeline into a single console — and the AI does the heavy lifting at each step.</p>
+      </div>
+      <div class="compare">
+        <div class="row"><span class="k">Find a lead</span><span class="old">3 tools</span><span class="new">1 scan</span></div>
+        <div class="row"><span class="k">Write the pitch</span><span class="old">30 min</span><span class="new">seconds</span></div>
+        <div class="row"><span class="k">Build the site</span><span class="old">2 weeks</span><span class="new">minutes</span></div>
+        <div class="row"><span class="k">Run the agency</span><span class="old">5 apps</span><span class="new">1 console</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BENTO -->
+  <section class="bento-wrap"><div class="wrap">
+    <div class="bhead"><div class="tag">Everything in one place</div><h2>The whole pipeline, built in.</h2></div>
+    <div class="bento">
+      <div class="b tall feat rise d1"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><h3>Real prospects</h3><p>Live local businesses from Google — scored on why they need you. Never invented.</p></div>
+      <div class="b wide rise d2"><h3>Pitches that land</h3><p>Specific, tactical outreach from the prospect's own data. Zero "unleash / seamless" filler.</p></div>
+      <div class="b rise d3"><div class="big">41</div><p class="mono" style="font-size:.6rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--faint);margin-top:6px">Industry playbooks</p></div>
+      <div class="b wide rise d3"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6l-5 6 5 6M16 6l5 6-5 6"/></svg><h3>Agent-built sites</h3><p>Complete, semantic, animated HTML you fully own and export — strict anti-slop bar.</p></div>
+      <div class="b rise d4"><div class="big">100%</div><p class="mono" style="font-size:.6rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--faint);margin-top:6px">Your code</p></div>
+      <div class="b wide rise d5"><h3>Agency OS + Marketplace</h3><p>Invoices, contracts, CRM, and a UI/UX template database — buy, sell, or unlock by plan.</p></div>
+    </div>
+  </div></section>
+
+  <footer>ᚱ&nbsp;&nbsp;RUNE SCRIPT · REDESIGN v2 · GOLD / BLACK / CREAM · CINZEL — BOLDER, 21ST-INSPIRED</footer>
+</body>
+</html>
