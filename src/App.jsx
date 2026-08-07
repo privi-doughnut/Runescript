@@ -562,11 +562,15 @@ const callClaude = async (prompt, max=1400, opts={}) => {
 // ── CSS ────────────────────────────────────────────────────────────────────
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=DM+Sans:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap');
+:root{--ease:cubic-bezier(.16,1,.3,1);--gold:#c9a84c;--gold2:#e6c979;}
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;min-width:0;}
+:where(a,button,.btn,input,select,textarea,[tabindex]):focus-visible{outline:none;box-shadow:0 0 0 2px #07070e,0 0 0 4px var(--gold);}
 html{background:#07070e;overflow-x:hidden;}body{background:#07070e;}
 
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
+@keyframes beam{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 @keyframes toast-in{from{opacity:0}to{opacity:1}}
 
@@ -581,8 +585,9 @@ html{background:#07070e;overflow-x:hidden;}body{background:#07070e;}
 .land-logo-g{color:#c9a84c;font-size:1.4rem;}
 .land-nav-r{display:flex;gap:10px;align-items:center;}
 .land-hero{display:grid;grid-template-columns:1fr 1fr;min-width:0;overflow:hidden;gap:clamp(24px,4vw,64px);align-items:center;padding:clamp(36px,6vw,80px) clamp(14px,4vw,60px) clamp(32px,5vw,70px);max-width:1280px;margin:0 auto;}
-.land-h1{font-family:'Cinzel',serif;font-size:clamp(2.4rem,4.2vw,4rem);font-weight:900;line-height:1.07;color:#ddd8ce;margin-bottom:22px;}
-.land-h1-gold{color:#c9a84c;}
+.land-h1{font-family:'Cinzel',serif;font-size:clamp(2.8rem,5.6vw,5.6rem);font-weight:900;line-height:1.02;letter-spacing:-1px;text-wrap:balance;color:#ddd8ce;margin-bottom:24px;}
+.land-h1-gold{color:#c9a84c;position:relative;display:inline-block;}
+.land-h1-gold::after{content:"";position:absolute;left:0;right:0;bottom:.02em;height:4px;background:linear-gradient(90deg,transparent,#e6c979,transparent);background-size:200% 100%;animation:beam 2.6s var(--ease) infinite;}
 .land-h1-dim{color:transparent;-webkit-text-stroke:1px rgba(201,168,76,.15);}
 .land-sub{font-size:.9rem;font-weight:300;color:#6a6878;line-height:1.85;margin-bottom:28px;max-width:100%;}
 .land-sub em{color:#9a9580;font-style:normal;font-weight:400;}
@@ -765,9 +770,10 @@ select.inp{cursor:pointer;}
 textarea.inp{resize:vertical;min-height:80px;}
 
 /* ── BUTTONS ── */
-.btn{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:2px;text-transform:uppercase;cursor:pointer;padding:9px 18px;border:none;transition:all .2s;display:inline-flex;align-items:center;justify-content:center;gap:7px;}
+.btn{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:2px;text-transform:uppercase;cursor:pointer;padding:9px 18px;border:none;transition:transform .18s var(--ease),background .2s var(--ease),border-color .2s var(--ease),color .2s var(--ease),box-shadow .2s var(--ease);display:inline-flex;align-items:center;justify-content:center;gap:7px;}
+.btn:active{transform:scale(.97);}
 .btn-gold{background:#c9a84c;color:#07070e;}
-.btn-gold:hover{background:#d4b55e;}
+.btn-gold:hover{background:#d8b95e;box-shadow:0 8px 26px rgba(201,168,76,.22);}
 .btn-gold:disabled{background:rgba(201,168,76,.25);cursor:not-allowed;}
 .btn-ghost{background:none;color:#4a4858;border:1px solid rgba(74,72,88,.3);}
 .btn-ghost:hover{color:#ddd8ce;border-color:rgba(221,216,206,.2);}
@@ -786,7 +792,7 @@ textarea.inp{resize:vertical;min-height:80px;}
 .btn-full{width:100%;padding:11px;}
 
 /* ── CARDS ── */
-.card{background:#0d0d18;border:1px solid rgba(201,168,76,.08);padding:20px;}
+.card{background:#0d0d18;border:1px solid rgba(201,168,76,.1);padding:20px;transition:border-color .3s var(--ease);}
 .card-title{font-family:'Cinzel',serif;font-size:.88rem;font-weight:700;color:#ddd8ce;margin-bottom:3px;}
 .card-sub{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6a6878;}
 
