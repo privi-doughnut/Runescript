@@ -1,6 +1,24 @@
 # Rune Script — Progress Report
 
-_Last updated: 2026-08-02 (sixth session — security hardening pass, verified live)_
+_Last updated: 2026-08-07 (seventh session — app redesign rollout, autonomous)_
+
+---
+
+## §1 — Owner action items (you-only; Claude nudges periodically)
+
+These need Privi, not Claude. Live list — keep current.
+
+1. **Re-run `SUPABASE_FINAL.sql`** — now includes §8 (tiered template unlocks) + §9
+   (UI/UX component database + copyright/licensing guardrails). Do before importing
+   real templates/components. Idempotent. (OWNER_TODO #14.)
+2. **Look at the live redesign** as it rolls out — sanity-check the new look on the
+   real site and flag anything off.
+3. **Cloudflare rate-limiting** on open endpoints (`/create-*`, `/pagespeed`,
+   `/domain-check`) — defense-in-depth. (OWNER_TODO #12.)
+4. **Confirm Google Places key is HTTP-referrer-restricted.** (OWNER_TODO #13.)
+5. **Optional:** `PAGESPEED_API_KEY` Cloudflare secret (unblocks Speed Optimizer /
+   real speed test — currently keyless quota is exhausted). (OWNER_TODO #10.)
+6. **Stripe** setup (parked) → unblocks creator payouts (Stripe Connect) + billing.
 
 ---
 
