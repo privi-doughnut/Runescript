@@ -805,7 +805,9 @@ textarea.inp{resize:vertical;min-height:80px;}
 
 /* ── DASHBOARD SPECIFIC ── */
 .dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:20px;}
-.metric-card{background:#0d0d18;border:1px solid rgba(201,168,76,.08);padding:18px;position:relative;overflow:hidden;}
+.metric-card{background:#0d0d18;border:1px solid rgba(201,168,76,.08);padding:18px;position:relative;overflow:hidden;transition:border-color .3s var(--ease),transform .3s var(--ease);}
+.metric-card:hover{border-color:rgba(201,168,76,.22);transform:translateY(-2px);}
+.metric-card:hover::after{opacity:.9;}
 .metric-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;opacity:.4;}
 .metric-gold::after{background:#c9a84c;}.metric-blue::after{background:#4a7aaa;}
 .metric-green::after{background:#5a9070;}.metric-purple::after{background:#9060b8;}
