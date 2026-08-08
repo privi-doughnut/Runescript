@@ -705,6 +705,19 @@ html{background:#07070e;overflow-x:hidden;}body{background:#07070e;}
 .land-faq-a p{padding-bottom:22px;font-size:.86rem;font-weight:300;color:#4a4858;line-height:1.9;}
 /* ── FULL LANDING: SECTION COMMONS ── */
 .land-sec{padding:clamp(44px,7vw,90px) clamp(14px,4vw,60px);max-width:1280px;margin:0 auto;}
+/* Cream editorial band — a stark paper-tone contrast beat between dark sections */
+.land-band{background:#efe7d6;color:#171310;padding:clamp(60px,9vw,128px) clamp(14px,4vw,60px);}
+.land-band-inner{max-width:1160px;margin:0 auto;display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(28px,5vw,72px);align-items:center;}
+.land-band-tag{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:2.5px;text-transform:uppercase;color:#8a6d2a;margin-bottom:20px;}
+.land-band h2{font-family:'Cinzel',serif;font-weight:900;font-size:clamp(2rem,4.6vw,3.7rem);line-height:1.04;letter-spacing:-.5px;text-wrap:balance;margin-bottom:22px;color:#171310;}
+.land-band p{font-size:1.05rem;color:#4a4038;max-width:46ch;line-height:1.75;font-weight:400;}
+.land-compare{border:1px solid rgba(23,19,16,.14);background:#f7f1e5;}
+.land-compare-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid rgba(23,19,16,.09);font-size:.92rem;}
+.land-compare-row:last-child{border-bottom:none;}
+.land-compare-k{color:#6a5f52;}
+.land-compare-old{color:#a0958a;text-decoration:line-through;font-family:'JetBrains Mono',monospace;font-size:.78rem;margin-left:auto;margin-right:16px;}
+.land-compare-new{color:#171310;font-weight:600;font-variant-numeric:tabular-nums;}
+@media(max-width:840px){.land-band-inner{grid-template-columns:1fr;gap:34px;}}
 .land-tag{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:4px;text-transform:uppercase;color:#c9a84c;opacity:.65;margin-bottom:14px;display:flex;align-items:center;gap:12px;}
 .land-tag::before{content:'';width:24px;height:1px;background:#c9a84c;opacity:.4;}
 .land-h2{font-family:'Cinzel',serif;font-size:clamp(1.8rem,2.9vw,2.8rem);font-weight:700;color:#ddd8ce;line-height:1.12;margin-bottom:14px;}
@@ -1960,6 +1973,26 @@ function LandingPage({onSignIn,onGetStarted,user,onDashboard}) {
           </div>
         ))}
       </div>
+
+      {/* MANIFESTO — cream editorial band, a bold contrast beat after the dark hero */}
+      <section className="land-band reveal">
+        <div className="land-band-inner">
+          <div>
+            <div className="land-band-tag">The old way is slow</div>
+            <h2>Most freelancers stitch together six tools. You need one.</h2>
+            <p>Prospecting in one tab, cold email in another, a site builder in a third, invoices somewhere else. Rune Script collapses the whole pipeline into a single console — and the AI does the heavy lifting at every step.</p>
+          </div>
+          <div className="land-compare">
+            {[["Find a lead","3 tools","1 scan"],["Write the pitch","30 min","seconds"],["Build the site","2 weeks","minutes"],["Run the agency","5 apps","1 console"]].map((r,i)=>(
+              <div key={i} className="land-compare-row">
+                <span className="land-compare-k">{r[0]}</span>
+                <span className="land-compare-old">{r[1]}</span>
+                <span className="land-compare-new">{r[2]}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* FEATURES */}
       <section className="land-sec reveal">
