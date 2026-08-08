@@ -576,6 +576,7 @@ html{background:#07070e;overflow-x:hidden;}body{background:#07070e;}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
 @keyframes beam{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes modalIn{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 @keyframes toast-in{from{opacity:0}to{opacity:1}}
@@ -865,8 +866,8 @@ tr:hover td{background:rgba(201,168,76,.02);cursor:pointer;}
 
 /* ── TABS ── */
 .tabs{display:flex;border-bottom:1px solid rgba(201,168,76,.08);margin-bottom:18px;}
-.tab{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;padding:9px 16px;cursor:pointer;color:#6a6878;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;background:none;border-left:none;border-right:none;border-top:none;}
-.tab:hover{color:#6a6878;}
+.tab{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:2px;text-transform:uppercase;padding:9px 16px;cursor:pointer;color:#6a6878;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .2s var(--ease),border-color .2s var(--ease);background:none;border-left:none;border-right:none;border-top:none;}
+.tab:hover{color:#ddd8ce;}
 .tab.on{color:#c9a84c;border-bottom-color:#c9a84c;}
 
 /* ── MISC ── */
@@ -878,7 +879,7 @@ tr:hover td{background:rgba(201,168,76,.02);cursor:pointer;}
 .t-success .toast-icon{color:#7ac89a;}.t-error .toast-icon{color:#e07888;}.t-info .toast-icon{color:#c9a84c;}
 .toast-msg{font-size:.8rem;font-weight:300;color:#9a96a2;flex:1;}
 .sh{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
-.sh-title{font-family:'Cinzel',serif;font-size:1rem;font-weight:700;color:#ddd8ce;}
+.sh-title{font-family:'Cinzel',serif;font-size:1.08rem;font-weight:700;letter-spacing:.3px;color:#ddd8ce;}
 .sh-sub{font-family:'JetBrains Mono',monospace;font-size:.54rem;letter-spacing:2px;color:#6a6878;text-transform:uppercase;margin-top:2px;}
 .sh-right{display:flex;gap:8px;align-items:center;}
 .empty{padding:48px 20px;text-align:center;}
@@ -1556,7 +1557,7 @@ tr:hover td{background:rgba(201,168,76,.02);cursor:pointer;}
 /* ── PHASE 3: AGENCY OS ── */
 .agency-layout{display:grid;grid-template-columns:220px 1fr;height:calc(100vh - 108px);border:1px solid rgba(201,168,76,.08);}
 .agency-nav{border-right:1px solid rgba(201,168,76,.08);background:#0a0a14;padding:12px 0;overflow-y:auto;}
-.agency-nav-item{display:flex;align-items:center;gap:10px;padding:10px 18px;cursor:pointer;transition:background .15s;position:relative;}
+.agency-nav-item{display:flex;align-items:center;gap:10px;padding:10px 18px;cursor:pointer;transition:background .2s var(--ease),color .2s var(--ease);position:relative;}
 .agency-nav-item:hover{background:rgba(201,168,76,.04);}
 .agency-nav-item.on{background:rgba(201,168,76,.07);}
 .agency-nav-item.on::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:#c9a84c;}
@@ -1595,8 +1596,8 @@ tr:hover td{background:rgba(201,168,76,.02);cursor:pointer;}
 .rev-card{background:#0d0d18;border:1px solid rgba(201,168,76,.08);padding:16px;}
 .rev-n{font-family:'Cinzel',serif;font-size:1.6rem;font-weight:700;color:#c9a84c;margin-bottom:4px;}
 .rev-l{font-family:'JetBrains Mono',monospace;font-size:.54rem;letter-spacing:2px;text-transform:uppercase;color:#6a6878;}
-.modal-bg{position:fixed;inset:0;background:rgba(7,7,14,.75);z-index:300;display:flex;align-items:center;justify-content:center;}
-.modal{background:#0d0d18;border:1px solid rgba(201,168,76,.12);padding:28px;width:min(480px,calc(100vw - 24px));max-height:90vh;overflow-y:auto;}
+.modal-bg{position:fixed;inset:0;background:rgba(5,5,11,.82);z-index:300;display:flex;align-items:center;justify-content:center;animation:fadein .2s ease;}
+.modal{background:#0d0d18;border:1px solid rgba(201,168,76,.16);padding:28px;width:min(480px,calc(100vw - 24px));max-height:90vh;overflow-y:auto;animation:modalIn .32s var(--ease);}
 .modal-title{font-family:'Cinzel',serif;font-size:1rem;font-weight:700;color:#ddd8ce;margin-bottom:4px;}
 .modal-sub{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:2px;text-transform:uppercase;color:#6a6878;margin-bottom:20px;}
 .line-items{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
