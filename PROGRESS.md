@@ -1,6 +1,6 @@
 # Rune Script — Progress Report
 
-_Last updated: 2026-08-07 (seventh session — app redesign rollout, autonomous)_
+_Last updated: 2026-08-14 (seventh session — app redesign rollout, complete)_
 
 ---
 
@@ -11,8 +11,9 @@ These need Privi, not Claude. Live list — keep current.
 1. **Re-run `SUPABASE_FINAL.sql`** — now includes §8 (tiered template unlocks) + §9
    (UI/UX component database + copyright/licensing guardrails). Do before importing
    real templates/components. Idempotent. (OWNER_TODO #14.)
-2. **Look at the live redesign** as it rolls out — sanity-check the new look on the
-   real site and flag anything off.
+2. **Look at the finished redesign live** — all six passes are now pushed. Check the
+   landing (hero stroke, cream band, bento) and the app shell on the real site and
+   flag anything off.
 3. **Cloudflare rate-limiting** on open endpoints (`/create-*`, `/pagespeed`,
    `/domain-check`) — defense-in-depth. (OWNER_TODO #12.)
 4. **Confirm Google Places key is HTTP-referrer-restricted.** (OWNER_TODO #13.)
@@ -21,6 +22,59 @@ These need Privi, not Claude. Live list — keep current.
 6. **Stripe** setup (parked) → unblocks creator payouts (Stripe Connect) + billing.
 
 ---
+
+## Seventh session (2026-08-07 → 08-14): redesign v2 rollout (COMPLETE)
+
+Goal: take the v2 direction prototyped in `public/redesign-preview.html` (bolder,
+21st-inspired — gold/black/**cream**, Cinzel at real display weight) and land it in
+the actual app without a risky 9,000-line per-screen rewrite. Strategy throughout:
+**elevate the shared CSS primitives** every screen already uses, so the whole app
+lifts at once, and only hand-build the genuinely new structural beats.
+
+**Six passes, all shipped:**
+
+1. **Shared design system** (`075f528`) — design tokens (`--ease` Expo.out
+   `cubic-bezier(.16,1,.3,1)`, `--gold`, `--gold2`), a global `:focus-visible` gold
+   ring on every interactive element (a11y), buttons off `transition:all` onto real
+   per-property eased transitions with a tactile `:active scale(.97)` and gold hover
+   glow, crisper cards, a bigger balanced Cinzel hero headline with an animated gold
+   beam under the gold word, and a `prefers-reduced-motion` guard.
+2. **Propagating polish** (`f5429dd`) — thin gold scrollbar (webkit + firefox), gold
+   `::selection`, bigger/balanced landing CTA heading, app-card hover lift.
+3. **App shell** (`3ddbc8b`) — tabs, section headers, sidebar nav, modals (`modalIn`
+   entrance + darker scrim). Fixed a dead `.tab:hover` that set the same color as its
+   base state (looked like a broken hover).
+4. **Dashboard** (`4fc9330`) — metric cards get a hover lift and accent brighten.
+5. **Landing structure** — the cream editorial manifesto band (`e310eb1`, a genuine
+   dark→cream→dark contrast beat with a strikethrough old-way/new-way panel), then
+   the **bento capability grid**: asymmetric tiles (tall feature tile with a gold
+   gradient wash, two wide tiles, two stat tiles, one full-width closing tile),
+   4-col → 2-col → 1-col responsive. Hero third line went to a heavier
+   `-webkit-text-stroke` (1.4px / .32 alpha) so the outline treatment actually reads.
+6. **Primitives sweep** — removed the **last 8** `transition:all` rules in the file
+   (CRM filters, draft sub-buttons, tone buttons, hamburger, page tabs, marketplace
+   filters, search input, option buttons) in favor of eased per-property transitions;
+   inputs got hover/focus states (brighter border, lifted bg, soft gold ring); table
+   rows got an eased hover with text brighten; toasts got an eased rise-in plus a
+   drop shadow; the auth card got the modal entrance animation and a real shadow.
+   Also fixed two more dead hovers (`.crm-f`, `.mkt-filter-btn` both re-set their own
+   base color) — same bug class as pass 3's.
+
+**Verified (not just compiled):**
+- `esbuild` parse: 0 errors. Duplicate-function check: clean. `transition:all` count
+  in `src/App.jsx`: **0**.
+- `npm run build` (Node 22 via nvm): clean production build.
+- **Real browser** (headless Chrome via Puppeteer against `vite preview` — note
+  Playwright refuses to install on this Mac's macOS 12, Puppeteer's Chrome for
+  Testing works): landing renders with the bento present (6 tiles, `repeat(4,1fr)`
+  desktop → single column at 390px, wide/tall spans correct), cream band live,
+  hero stroke computing at 1.4px, `--ease` token resolving, **no horizontal
+  overflow at 1440px or 390px**. Clicked through to the sign-in card: `modalIn`
+  animation applied, input focus ring computing as
+  `rgba(201,168,76,.07) 0 0 0 3px`. Zero page errors.
+- Only console noise is pre-existing and localhost-only: the `sw.js` MIME warning
+  (no `public/sw.js` exists — known, harmless) and a CORS rejection because the
+  Worker's allowlist is the production origin, not `localhost`.
 
 ## Sixth session (2026-08-02): security hardening
 
